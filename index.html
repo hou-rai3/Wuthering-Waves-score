@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web版 装備スコア計算機</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fuse.js/dist/fuse.min.js"></script>
+    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* 基本的なスタイルと背景設定 */
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-image: url('ここに画像のURLを貼り付け'); /* 例: https://i.imgur.com/example.jpg */
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }
+        /* ローディングアニメーションのスピナー色を変更 */
+        .loader {
+            border: 5px solid #4a5568; /* gray-700 */
+            border-top: 5px solid #63b3ed; /* blue-400 */
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* ダークテーマ用のフォーム要素のスタイル調整 */
+        select, input[type="checkbox"] {
+            background-color: #2d3748; /* gray-800 */
+            border-color: #4a5568; /* gray-600 */
+            color: #e2e8f0; /* gray-200 */
+        }
+        input[type="checkbox"]:checked {
+            background-color: #4299e1; /* blue-500 */
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200">
+
+    <div class="container mx-auto p-4 max-w-3xl min-h-screen flex items-center justify-center">
+        <div class="w-full bg-gray-900/70 backdrop-blur-md rounded-xl shadow-2xl border border-gray-700/50 p-6">
+            
+            <div class="flex flex-wrap items-start gap-4 mb-4">
+                <div class="flex items-center">
+                    <label for="game-select" class="font-bold mr-2 text-blue-400">★ ゲーム:</label>
+                    <select id="game-select" class="p-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></select>
+                </div>
+                <div class="flex items-center">
+                    <label id="character-label" for="character-select" class="font-bold mr-2 text-blue-400">① キャラクター:</label>
+                    <select id="character-select" class="p-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></select>
+                </div>
+            </div>
+
+            <div id="canvas-container" class="relative w-full h-80 bg-black/30 rounded-lg border-2 border-dashed border-gray-500 flex justify-center items-center mb-4 overflow-hidden transition-all duration-300">
+                <canvas id="image-canvas" class="hidden"></canvas>
+                <div id="info-overlay" class="text-center text-gray-400">
+                    <p id="paste-label" class="text-lg font-bold">ここにスクリーンショットを Ctrl+V</p>
+                    <p class="text-sm">(または画像をドラッグ＆ドロップ)</p>
+                </div>
+                <div id="loader-overlay" class="absolute inset-0 bg-black/80 flex-col justify-center items-center hidden">
+                    <div class="loader mb-2"></div>
+                    <p id="loader-text" class="text-blue-400 font-semibold">OCRでステータスを認識中...</p>
+                </div>
+            </div>
+
+            <div class="flex items-center mb-4">
+                <input type="checkbox" id="show-processed-check" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                <label for="show-processed-check" class="ml-2 block text-sm text-gray-300">処理後画像を表示 (デバッグ用)</label>
+            </div>
+
+            <div class="bg-black/20 p-4 rounded-lg">
+                <h3 id="item-name-title-label" class="text-center font-bold text-lg mb-1 text-gray-300">--- 認識された装備 ---</h3>
+                <p id="item-name-label" class="text-center text-xl font-semibold text-sky-400 mb-4">...</p>
+                
+                <div id="result-table" class="space-y-1 text-sm">
+                    </div>
+                
+                <div class="mt-4">
+                    <p id="formula-label" class="text-xs text-gray-400 text-center">計算式:</p>
+                    <div id="score-label" class="text-center text-5xl font-bold bg-gradient-to-br from-sky-500/30 to-indigo-500/30 text-white p-3 rounded-lg mt-1 shadow-lg">0</div>
+                </div>
+            </div>
+        </div>
+        <footer class="fixed bottom-2 right-4 text-xs text-white/50">
+            <p>Web版 装備スコア計算機</p>
+        </footer>
+    </div>
+
+<script>
+// ===================================================================
+// 設定 (header.py から移植)
+// ===================================================================
+const GAME_CONFIGS = {
+    "鳴潮": {
+        "title": "Web版 鳴潮 音骸スコア計算機",
+        "item_name_crop_area": [1380, 135, 1800-1380, 185-135],
+        "stats_crop_area": [1400, 230, 1880-1400, 530-230],
+        "character_label": "① キャラクター:",
+        "paste_label": "② ここに音骸のスクショをCtrl+V",
+        "recognized_item_label": "--- 認識された音骸 ---",
+        "ocr_settings": {
+            "threshold": 128,
+            "tesseract_config": {
+                "psm": 4,
+                "tessedit_char_whitelist": "0123456789%+.攻撃力防御HPクリティカルダメージ効率アップ重撃通常スキル解放共鳴治癒効果消滅伝導回折凝縮熱熔気動"
+            }
+        },
+        "stat_map": { 'クリティカル': 'クリティカル','クリティカルダメージ': 'クリティカルダメージ','HP': 'HP','攻撃力': '攻撃力','防御力': '防御力','共鳴効率': '共鳴効率','共鳴解放ダメージアップ': '共鳴解放ダメージアップ','共鳴スキルダメージアップ': '共鳴スキルダメージアップ','重撃ダメージアップ': '重撃ダメージアップ','通常攻撃ダメージアップ': '通常攻撃ダメージアップ','治癒効果': '治癒効果','消滅ダメージアップ': '消滅ダメージアップ','伝導ダメージアップ': '伝導ダメージアップ','回折ダメージアップ': '回回折ダメージアップ','凝縮ダメージアップ': '凝縮ダメージアップ','熱熔ダメージアップ': '熱熔ダメージアップ','気動ダメージアップ': '気動ダメージアップ', '攻撃カ': '攻撃力', 'クリティ力ル': 'クリティカル', '共鳴効串': '共鳴効率' },
+        "parsing_rules": { "regex": /(.+?)\s+([\d.,]+%?)$/, "stat_types": ['攻撃力', 'HP', '防御力']},
+        "character_builds": { "忌炎": { "main": { '気動ダメージアップ': 1, 'クリティカル': 1, 'クリティカルダメージ': 1, '攻撃力(%)': 1 }, "sub": { 'クリティカル': 1.0, 'クリティカルダメージ': 1.0, '重撃ダメージアップ': 1.0, '攻撃力(%)': 1.0, '共鳴効率': 0.8, '攻撃力(実数値)': 0.05, '共鳴スキルダメージアップ': 0.25 } } }
+    },
+    // 他のゲーム設定もここに追加可能
+};
+
+// ===================================================================
+// アプリケーション本体
+// ===================================================================
+document.addEventListener('DOMContentLoaded', () => {
+    // --- DOM要素の取得 ---
+    const gameSelect = document.getElementById('game-select');
+    const characterSelect = document.getElementById('character-select');
+    const charLabel = document.getElementById('character-label');
+    const canvasContainer = document.getElementById('canvas-container');
+    const imageCanvas = document.getElementById('image-canvas');
+    const ctx = imageCanvas.getContext('2d', { willReadFrequently: true });
+    const infoOverlay = document.getElementById('info-overlay');
+    const pasteLabel = document.getElementById('paste-label');
+    const loaderOverlay = document.getElementById('loader-overlay');
+    const loaderText = document.getElementById('loader-text');
+    const showProcessedCheck = document.getElementById('show-processed-check');
+    const itemNameTitleLabel = document.getElementById('item-name-title-label');
+    const itemNameLabel = document.getElementById('item-name-label');
+    const resultTable = document.getElementById('result-table');
+    const formulaLabel = document.getElementById('formula-label');
+    const scoreLabel = document.getElementById('score-label');
+
+    // --- アプリケーションの状態管理 ---
+    let originalImage = null;
+    let currentConfig = null;
+    let fuse = null;
+
+    // --- OCRワーカーの初期化 ---
+    let ocrWorker = null;
+    async function initializeOcrWorker() {
+        loaderText.textContent = 'OCRエンジンを準備中...';
+        loaderOverlay.style.display = 'flex';
+        ocrWorker = await Tesseract.createWorker('jpn', 1, {
+            logger: m => console.log(m)
+        });
+        loaderOverlay.style.display = 'none';
+        console.log('Tesseract Worker Initialized');
+    }
+    initializeOcrWorker();
+
+    // --- 初期化処理 ---
+    function initialize() {
+        Object.keys(GAME_CONFIGS).forEach(gameName => {
+            const option = document.createElement('option');
+            option.value = gameName;
+            option.textContent = gameName;
+            gameSelect.appendChild(option);
+        });
+        gameSelect.value = Object.keys(GAME_CONFIGS)[0];
+        onGameChange();
+        setupDragAndDrop();
+    }
+
+    // --- イベントリスナー ---
+    gameSelect.addEventListener('change', onGameChange);
+    characterSelect.addEventListener('change', processAndDisplay);
+    showProcessedCheck.addEventListener('change', displayImage);
+    window.addEventListener('paste', handlePaste);
+
+    // --- ゲーム変更時の処理 ---
+    function onGameChange() {
+        const gameName = gameSelect.value;
+        currentConfig = GAME_CONFIGS[gameName];
+        
+        document.title = currentConfig.title;
+        charLabel.textContent = currentConfig.character_label;
+        pasteLabel.textContent = currentConfig.paste_label;
+        itemNameTitleLabel.textContent = currentConfig.recognized_item_label;
+
+        characterSelect.innerHTML = '';
+        const charBuilds = currentConfig.character_builds;
+        Object.keys(charBuilds).forEach(charName => {
+            const option = document.createElement('option');
+            option.value = charName;
+            option.textContent = charName;
+            characterSelect.appendChild(option);
+        });
+        
+        const statKeys = Object.keys(currentConfig.stat_map);
+        fuse = new Fuse(statKeys, { includeScore: true, threshold: 0.5 });
+
+        resetResults();
+        displayImage();
+    }
+
+    // --- 画像処理 & 表示 ---
+    function handleImage(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                originalImage = img;
+                infoOverlay.style.display = 'none';
+                imageCanvas.classList.remove('hidden');
+                processAndDisplay();
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function handlePaste(e) {
+        const items = e.clipboardData.items;
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1) {
+                const file = items[i].getAsFile();
+                handleImage(file);
+                break;
+            }
+        }
+    }
+
+    function setupDragAndDrop() {
+        canvasContainer.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            canvasContainer.classList.add('border-blue-400', 'bg-black/50');
+        });
+        canvasContainer.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            canvasContainer.classList.remove('border-blue-400', 'bg-black/50');
+        });
+        canvasContainer.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            canvasContainer.classList.remove('border-blue-400', 'bg-black/50');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleImage(files[0]);
+            }
+        });
+    }
+
+    async function processAndDisplay() {
+        if (!originalImage) return;
+        resetResults();
+        displayImage();
+
+        loaderText.textContent = 'OCRでステータスを認識中...';
+        loaderOverlay.style.display = 'flex';
+        
+        try {
+            const statsCropArea = currentConfig.stats_crop_area;
+            const processedCanvas = await preprocessForOcr(originalImage, statsCropArea, currentConfig.ocr_settings);
+            
+            const { data: { text } } = await ocrWorker.recognize(processedCanvas, {}, currentConfig.ocr_settings.tesseract_config);
+
+            const statsForCalc = parseStats(text);
+            if (statsForCalc.length === 0) {
+                alert(`ステータスを読み取れませんでした。\n\n[認識した元テキスト]:\n${text}`);
+                return;
+            }
+            
+            const build = currentConfig.character_builds[characterSelect.value];
+            const { total_score, scored_stats, formula } = calculateScore(statsForCalc, build);
+            
+            displayResults(scored_stats, formula, total_score);
+
+        } catch (error) {
+            console.error("処理エラー:", error);
+            alert("画像の解析中に予期せぬエラーが発生しました。");
+        } finally {
+            loaderOverlay.style.display = 'none';
+            if (showProcessedCheck.checked) {
+                displayImage();
+            }
+        }
+    }
+
+    function displayImage() {
+        if (!originalImage) {
+            imageCanvas.classList.add('hidden');
+            infoOverlay.style.display = 'flex';
+            return;
+        }
+
+        imageCanvas.width = originalImage.width;
+        imageCanvas.height = originalImage.height;
+        ctx.drawImage(originalImage, 0, 0);
+
+        if (showProcessedCheck.checked) {
+            const statsCropArea = currentConfig.stats_crop_area;
+            preprocessForOcr(originalImage, statsCropArea, currentConfig.ocr_settings)
+                .then(processedCanvas => {
+                    ctx.drawImage(processedCanvas, statsCropArea[0], statsCropArea[1]);
+                    drawBoundingBoxes();
+                    fitCanvasToContainer();
+                });
+        } else {
+            drawBoundingBoxes();
+            fitCanvasToContainer();
+        }
+    }
+    
+    function drawBoundingBoxes() {
+        ctx.strokeStyle = "red";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(...currentConfig.item_name_crop_area);
+        
+        ctx.strokeStyle = "cyan";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(...currentConfig.stats_crop_area);
+    }
+    
+    function fitCanvasToContainer() {
+        const ratio = Math.min(canvasContainer.clientWidth / imageCanvas.width, canvasContainer.clientHeight / imageCanvas.height);
+        imageCanvas.style.width = `${imageCanvas.width * ratio}px`;
+        imageCanvas.style.height = `${imageCanvas.height * ratio}px`;
+    }
+
+    async function preprocessForOcr(img, crop, settings) {
+        const [x, y, w, h] = crop;
+        const scale = 3.0;
+
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = w * scale;
+        tempCanvas.height = h * scale;
+        const tempCtx = tempCanvas.getContext('2d');
+        
+        tempCtx.drawImage(img, x, y, w, h, 0, 0, w * scale, h * scale);
+        
+        const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+        const data = imageData.data;
+
+        for (let i = 0; i < data.length; i += 4) {
+            const avg = (data[i] + data[i+1] + data[i+2]) / 3;
+            const inverted = 255 - avg;
+            data[i] = inverted;
+            data[i+1] = inverted;
+            data[i+2] = inverted;
+        }
+        tempCtx.putImageData(imageData, 0, 0);
+
+        const contrastImageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+        const contrastData = contrastImageData.data;
+        let min = 255, max = 0;
+        for (let i = 0; i < contrastData.length; i += 4) {
+            if (contrastData[i] < min) min = contrastData[i];
+            if (contrastData[i] > max) max = contrastData[i];
+        }
+        const range = max - min;
+        if (range > 0) {
+            for (let i = 0; i < contrastData.length; i += 4) {
+                const value = ((contrastData[i] - min) / range) * 255;
+                const binary = value > settings.threshold ? 255 : 0;
+                contrastData[i] = binary;
+                contrastData[i+1] = binary;
+                contrastData[i+2] = binary;
+            }
+        }
+        tempCtx.putImageData(contrastImageData, 0, 0);
+
+        return tempCanvas;
+    }
+
+    // --- パース & 計算 ---
+    function findBestStatMatch(name) {
+        const results = fuse.search(name.replace(/[+.\s]/g, ''));
+        if (results.length > 0) {
+            return results[0].item;
+        }
+        return null;
+    }
+
+    function parseStats(text) {
+        let statsForCalc = [];
+        const lines = text.split('\n').filter(line => line.trim() !== '');
+        
+        for (const line of lines) {
+            const match = line.match(currentConfig.parsing_rules.regex);
+            if (match) {
+                const rawName = match[1].trim();
+                const value = match[2].trim();
+                
+                const matchedName = findBestStatMatch(rawName);
+                if(matchedName) {
+                    const canonicalName = currentConfig.stat_map[matchedName];
+                    let statKey = canonicalName;
+                    if (currentConfig.parsing_rules.stat_types.includes(canonicalName)) {
+                        statKey = value.includes('%') ? `${canonicalName}(%)` : `${canonicalName}(実数値)`;
+                    }
+                    statsForCalc.push([statKey, value]);
+                }
+            }
+        }
+        return statsForCalc;
+    }
+
+    function calculateScore(stats, build) {
+        let total_score = 0;
+        let scored_stats = [];
+        let formula_parts = [];
+
+        const mainMult = build.main || {};
+        const subMult = build.sub || {};
+
+        stats.forEach((stat, i) => {
+            const [key, valueStr] = stat;
+            let current_score = 0;
+            let tag = 'sub';
+
+            if (i === 0) {
+                tag = 'main';
+                if (mainMult[key] > 0) {
+                    current_score = 15.0;
+                }
+            } else {
+                const numericValue = parseFloat(valueStr.replace('%', '').replace(',', '')) || 0;
+                const multiplier = subMult[key] || 0;
+                current_score = numericValue * multiplier;
+            }
+            
+            total_score += current_score;
+            if (current_score > 0.001) {
+                formula_parts.push(current_score.toFixed(2));
+            }
+            scored_stats.push({ name: key, value: valueStr, score: current_score, tag });
+        });
+
+        const formula = formula_parts.join(" + ") + ` = ${total_score.toFixed(2)}`;
+        return { total_score, scored_stats, formula };
+    }
+
+    // --- 結果表示 ---
+    function resetResults() {
+        itemNameLabel.textContent = '...';
+        resultTable.innerHTML = '';
+        formulaLabel.textContent = '計算式:';
+        scoreLabel.textContent = '0';
+    }
+
+    function displayResults(scored_stats, formula, total_score) {
+        resultTable.innerHTML = '';
+        scored_stats.forEach(stat => {
+            const row = document.createElement('div');
+            // スコアに応じて色を変化
+            const scoreColorClass = stat.score > 10 ? 'text-sky-300' : stat.score > 5 ? 'text-green-300' : 'text-gray-300';
+            const tagClass = stat.tag === 'main' ? 'bg-sky-500/20 font-bold border-l-4 border-sky-400' : 'bg-gray-800/50';
+            row.className = `grid grid-cols-3 gap-2 p-2 rounded-md ${tagClass}`;
+            row.innerHTML = `
+                <span class="col-span-1 truncate">${stat.name}</span>
+                <span class="text-center">${stat.value}</span>
+                <span class="text-right font-mono ${scoreColorClass}">${stat.score.toFixed(2)}</span>
+            `;
+            resultTable.appendChild(row);
+        });
+        formulaLabel.textContent = `計算式: ${formula}`;
+        scoreLabel.textContent = Math.round(total_score);
+    }
+    
+    // アプリケーション起動
+    initialize();
+});
+</script>
+</body>
+</html>
