@@ -1,0 +1,66 @@
+/* 基本的なスタイルと背景設定 */
+body {
+    font-family: 'BIZ UDGothic', 'BIZ UDPGothic', serif; /* 明朝体フォント */
+    /* ↓ここに高貴なダークゴールド系の背景画像URLを貼り付け。指定しない場合は下の黒背景になります */
+    /* background-image: url('https://i.imgur.com/your-image.jpg'); */
+    background-color: #121212;
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+}
+
+/* ローディングアニメーション */
+.loader {
+    border: 5px solid #333;
+    border-top: 5px solid #FFD700; /* Gold */
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* フォーム要素のスタイル調整 */
+select, input[type="text"] {
+    background-color: #1f1f1f;
+    border: 1px solid #444;
+    color: #f0f0f0;
+    padding: 8px 12px;
+    border-radius: 0; /* 角を立たせる */
+    appearance: none;
+}
+select:focus, input[type="text"]:focus {
+    border-color: #FFD700; /* Gold on focus */
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.4); /* Gold glow */
+}
+input[type="checkbox"] {
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border: 1px solid #666;
+    background-color: #1f1f1f;
+    position: relative;
+    vertical-align: middle;
+    cursor: pointer;
+    border-radius: 0; /* 角を立たせる */
+}
+input[type="checkbox"]:checked {
+    background-color: #FFD700;
+    border-color: #FFD700;
+}
+input[type="checkbox"]:checked::before {
+    content: '✔';
+    display: block;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #121212;
+    font-size: 14px;
+    font-weight: bold;
+    line-height: 1;
+}
