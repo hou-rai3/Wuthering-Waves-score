@@ -5,8 +5,8 @@
 export const GAME_CONFIGS = {
     "鳴潮": {
         "title": "鳴潮 音骸スコア計算機",
-        "item_name_crop_area": [1380, 135, 1800 - 1380, 185 - 135],
-        "stats_crop_area": [1400, 230, 1880 - 1400, 530 - 230],
+        "item_name_crop_area": [1380, 135, 420, 50], // [x, y, width, height] = [1380, 135, 1800-1380, 185-135]
+        "stats_crop_area": [1400,190, 500, 290], // [x, y, width, height] = [1400, 230, 1880-1400, 530-230]
         "character_label": "① キャラクター:",
         "paste_label": "② ここに音骸のスクショをCtrl+V",
         "recognized_item_label": "--- 認識された音骸 ---",
