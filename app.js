@@ -39,9 +39,14 @@ document.addEventListener('DOMContentLoaded', () => {
         
         try {
             hybridOCR = new LightweightHybridOCR();
-            await hybridOCR.initializeSystem();
-            // ゲーム設定をOCRシステムへ紐付け（鳴潮専用化）
+            // 鳴潮専用設定をOCRへ紐付け
             hybridOCR.gameConfigs = GAME_CONFIGS;
+
+            // OpenCV準備完了をポーリング（最大10秒）
+            const start = Date.now();
+            while (!hybridOCR.isOpenCVReady && (Date.now() - start) < 10000) {
+                await new Promise(r => setTimeout(r, 200));
+            }
             console.log('Lightweight OCR System ready');
         } catch (error) {
             console.error('OCR initialization failed:', error);
