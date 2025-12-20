@@ -18,7 +18,7 @@ export const GAME_CONFIGS = {
         },
 
         // 従来式は使用しないが、最低限の設定は保持
-        item_name_crop_area: [200, 120, 200, 120],
+        item_name_crop_area: [640, 120, 640, 120],
         stats_crop_area: [960 - 400, 300, 800, 700],
         
         // OCR設定
