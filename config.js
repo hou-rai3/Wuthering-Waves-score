@@ -10,19 +10,19 @@ export const GAME_CONFIGS = {
         paste_label: "鳴潮の音骸スクショを Ctrl+V",
         recognized_item_label: "--- 認識された音骸 ---",
 
-        // 3エリア認識の座標（1920x1080想定。必要に応じ調整してください）
+        // 3エリア認識の座標（1366x768前後のスクショ例。必要に応じ微調整してください）
         three_area_recognition: {
             // 音骸名前（右上タイトル付近）
-            item_name_area: [1210, 110, 600, 90],
+            item_name_area: [900, 70, 430, 70],
             // メインオプション（上段2行）
-            excluded_stats_area: [1210, 220, 600, 90],
+            excluded_stats_area: [900, 150, 430, 80],
             // サブオプション（下段5行）
-            included_stats_area: [1210, 320, 600, 220]
+            included_stats_area: [900, 240, 430, 190]
         },
 
         // 従来式は使用しないが、最低限の設定は保持（未使用）
-        item_name_crop_area: [1210, 110, 600, 90],
-        stats_crop_area: [1210, 320, 600, 220],
+        item_name_crop_area: [900, 70, 430, 70],
+        stats_crop_area: [900, 240, 430, 190],
         
         // OCR設定
         ocr_settings: {
