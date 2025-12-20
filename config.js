@@ -13,11 +13,11 @@ export const GAME_CONFIGS = {
         // 3エリア認識の座標（1366x768前後のスクショ例。必要に応じ微調整してください）
         three_area_recognition: {
             // 音骸名前（右上タイトル付近）
-            item_name_area: [900, 70, 430, 70],
+            item_name_area: [720, 70, 190, 20],
             // メインオプション（上段2行）
-            excluded_stats_area: [900, 150, 430, 80],
+            excluded_stats_area: [720, 140, 205, 20],
             // サブオプション（下段5行）
-            included_stats_area: [900, 240, 430, 190]
+            included_stats_area: [720, 120, 205, 123]
         },
 
         // 従来式は使用しないが、最低限の設定は保持（未使用）
