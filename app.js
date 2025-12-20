@@ -19,7 +19,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const loaderOverlay = document.getElementById('loader-overlay');
     const loaderText = document.getElementById('loader-text');
     const showProcessedCheck = document.getElementById('show-processed-check');
-    const autoScaleCheck = document.getElementById('auto-scale-check');
     const itemNameTitleLabel = document.getElementById('item-name-title-label');
     const itemNameLabel = document.getElementById('item-name-label');
     const resultTable = document.getElementById('result-table');
@@ -244,39 +243,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function getBaseResolution() {
-        const base = currentConfig?.base_resolution;
-        if (base?.width && base?.height) return base;
-        return { width: originalImage?.width || 1366, height: originalImage?.height || 768 };
-    }
-
-    function scaleAreasForImage(baseAreas) {
-        if (!baseAreas) return null;
-        const baseRes = getBaseResolution();
-        const imgW = originalImage?.width || baseRes.width;
-        const imgH = originalImage?.height || baseRes.height;
-        const scaleX = imgW / baseRes.width;
-        const scaleY = imgH / baseRes.height;
-        const scaleRect = (rect) => [
-            Math.round(rect[0] * scaleX),
-            Math.round(rect[1] * scaleY),
-            Math.round(rect[2] * scaleX),
-            Math.round(rect[3] * scaleY),
-        ];
-        return {
-            item_name_area: scaleRect(baseAreas.item_name_area),
-            excluded_stats_area: scaleRect(baseAreas.excluded_stats_area),
-            included_stats_area: scaleRect(baseAreas.included_stats_area)
-        };
-    }
-
     function getWorkingAreas() {
         if (!currentConfig?.three_area_recognition) return null;
-        const baseAreas = currentConfig.three_area_recognition;
-        if (autoScaleCheck && autoScaleCheck.checked) {
-            return scaleAreasForImage(baseAreas);
-        }
-        return baseAreas;
+        return currentConfig.three_area_recognition;
     }
 
     function createPerformanceButton() {
@@ -432,8 +401,7 @@ document.addEventListener('DOMContentLoaded', () => {
             recognizedResult = await hybridOCR.recognizeThreeAreas(
                 imageCanvas,
                 '鳴潮',
-                workingAreas,
-                { alreadyScaled: true }
+                workingAreas
             );
 
             // 結果をレガシー形式に変換

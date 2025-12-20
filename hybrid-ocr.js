@@ -252,15 +252,13 @@ export class LightweightHybridOCR {
      * 3エリア認識システム - 計算式の改善
      * エリア1: 音骸名前 / エリア2: 含めないステータス / エリア3: 含めるステータス
      */
-    async recognizeThreeAreas(imageCanvas, gameType, areaOverride = null, options = {}) {
+    async recognizeThreeAreas(imageCanvas, gameType, areaOverride = null) {
         const gameConfig = this.gameConfigs[gameType];
         if (!gameConfig.three_area_recognition && !areaOverride) {
             throw new Error(`3エリア認識設定が見つかりません: ${gameType}`);
         }
 
-        const baseAreas = areaOverride || gameConfig.three_area_recognition;
-        const shouldScale = options.alreadyScaled ? false : options.autoScale !== false;
-        const areas = this.scaleAreasForImage(baseAreas, gameConfig, imageCanvas, shouldScale);
+        const areas = areaOverride || gameConfig.three_area_recognition;
         const results = {
             itemName: { text: '', confidence: 0, area: 'item_name' },
             excludedStats: [], // 計算から除外するステータス
@@ -662,32 +660,6 @@ export class LightweightHybridOCR {
             .replace(/[^0-9.,%+]/g, '') // 数値関連文字以外を除去
             .replace(/([0-9])([0-9])\.([0-9])/, '$1.$2$3') // 小数点位置修正
             .trim();
-    }
-
-    scaleAreasForImage(baseAreas, gameConfig, imageCanvas, shouldScale = true) {
-        if (!baseAreas) return null;
-        if (!shouldScale) return JSON.parse(JSON.stringify(baseAreas));
-
-        const baseRes = gameConfig?.base_resolution || {
-            width: imageCanvas?.width || 1,
-            height: imageCanvas?.height || 1
-        };
-        const imgW = imageCanvas?.width || baseRes.width;
-        const imgH = imageCanvas?.height || baseRes.height;
-        const scaleX = imgW / baseRes.width;
-        const scaleY = imgH / baseRes.height;
-        const scaleRect = (rect) => [
-            Math.round(rect[0] * scaleX),
-            Math.round(rect[1] * scaleY),
-            Math.round(rect[2] * scaleX),
-            Math.round(rect[3] * scaleY)
-        ];
-
-        return {
-            item_name_area: scaleRect(baseAreas.item_name_area),
-            excluded_stats_area: scaleRect(baseAreas.excluded_stats_area),
-            included_stats_area: scaleRect(baseAreas.included_stats_area)
-        };
     }
 
     scaleCanvas(canvas, scale) {
