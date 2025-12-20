@@ -10,6 +10,9 @@ export const GAME_CONFIGS = {
         paste_label: "鳴潮の音骸スクショを Ctrl+V",
         recognized_item_label: "--- 認識された音骸 ---",
 
+        // 基準解像度（この解像度を基準に座標を記述します）
+        base_resolution: { width: 1366, height: 768 },
+
         // 3エリア認識の座標（1366x768前後のスクショ例。必要に応じ微調整してください）
         three_area_recognition: {
             // 音骸名前（右上タイトル付近）

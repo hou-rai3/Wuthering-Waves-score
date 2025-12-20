@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const loaderOverlay = document.getElementById('loader-overlay');
     const loaderText = document.getElementById('loader-text');
     const showProcessedCheck = document.getElementById('show-processed-check');
+    const autoScaleCheck = document.getElementById('auto-scale-check');
     const itemNameTitleLabel = document.getElementById('item-name-title-label');
     const itemNameLabel = document.getElementById('item-name-label');
     const resultTable = document.getElementById('result-table');
@@ -243,6 +244,41 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function getBaseResolution() {
+        const base = currentConfig?.base_resolution;
+        if (base?.width && base?.height) return base;
+        return { width: originalImage?.width || 1366, height: originalImage?.height || 768 };
+    }
+
+    function scaleAreasForImage(baseAreas) {
+        if (!baseAreas) return null;
+        const baseRes = getBaseResolution();
+        const imgW = originalImage?.width || baseRes.width;
+        const imgH = originalImage?.height || baseRes.height;
+        const scaleX = imgW / baseRes.width;
+        const scaleY = imgH / baseRes.height;
+        const scaleRect = (rect) => [
+            Math.round(rect[0] * scaleX),
+            Math.round(rect[1] * scaleY),
+            Math.round(rect[2] * scaleX),
+            Math.round(rect[3] * scaleY),
+        ];
+        return {
+            item_name_area: scaleRect(baseAreas.item_name_area),
+            excluded_stats_area: scaleRect(baseAreas.excluded_stats_area),
+            included_stats_area: scaleRect(baseAreas.included_stats_area)
+        };
+    }
+
+    function getWorkingAreas() {
+        if (!currentConfig?.three_area_recognition) return null;
+        const baseAreas = currentConfig.three_area_recognition;
+        if (autoScaleCheck && autoScaleCheck.checked) {
+            return scaleAreasForImage(baseAreas);
+        }
+        return baseAreas;
+    }
+
     function createPerformanceButton() {
         const perfButton = document.createElement('button');
         perfButton.className = 'fixed bottom-4 left-4 bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded text-xs z-40';
@@ -392,7 +428,13 @@ document.addEventListener('DOMContentLoaded', () => {
             let recognizedResult = null;
             loaderText.textContent = '3エリア認識実行中...';
 
-            recognizedResult = await hybridOCR.recognizeThreeAreas(imageCanvas, '鳴潮');
+            const workingAreas = getWorkingAreas();
+            recognizedResult = await hybridOCR.recognizeThreeAreas(
+                imageCanvas,
+                '鳴潮',
+                workingAreas,
+                { alreadyScaled: true }
+            );
 
             // 結果をレガシー形式に変換
             if (recognizedResult) {
@@ -522,7 +564,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function drawBoundingBoxes() {
         // 3エリア認識対応のバウンディングボックス
         if (currentConfig.three_area_recognition) {
-            const areas = currentConfig.three_area_recognition;
+            const areas = getWorkingAreas() || currentConfig.three_area_recognition;
             
             // エリア1: 音骸名前 (赤色)
             ctx.strokeStyle = "#ff4444";
@@ -738,6 +780,38 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             
             resultTable.appendChild(statsInfo);
+        }
+
+        // デバッグ表示（信頼度チェックON時のみ詳細を表示）
+        if (showConfidenceCheck?.checked && recognizedResult?.debug) {
+            const dbg = recognizedResult.debug;
+            const areas = dbg.areasUsed || {};
+            const trimList = (list, max = 6) => (list || []).slice(0, max);
+            const makeLines = (entries, label) => {
+                if (!entries || entries.length === 0) return `<div class="text-gray-500">${label}: 0件</div>`;
+                return entries.map((e, idx) => {
+                    const conf = Math.round((e.confidence || 0) * 100);
+                    return `<div class="border-b border-gray-700/50 py-1"><span class="text-gray-400">${label}[${idx}]</span> <span class="text-white">${e.name || '-'} = ${e.value || '-'}</span> <span class="text-yellow-300">${conf}%</span><div class="text-gray-500 text-[11px]">${e.rawText || ''}</div></div>`;
+                }).join('');
+            };
+
+            const debugDiv = document.createElement('div');
+            debugDiv.className = 'mt-3 p-3 bg-gray-900/80 border border-gray-700 text-xs text-gray-200 rounded space-y-2';
+            debugDiv.innerHTML = `
+                <div class="font-bold text-orange-300">デバッグ情報</div>
+                <div class="text-gray-300">画像サイズ: ${dbg.imageSize?.width || '?'} x ${dbg.imageSize?.height || '?'}</div>
+                <div class="text-gray-300">使用座標: 名[${(areas.item_name_area || []).join(', ')}], 除外[${(areas.excluded_stats_area || []).join(', ')}], 計算[${(areas.included_stats_area || []).join(', ')}]</div>
+                <div class="text-gray-300">行検出: 除外 ${dbg.excluded?.lines?.length || 0} 行 / 計算 ${dbg.included?.lines?.length || 0} 行</div>
+                <div class="bg-red-900/30 border border-red-700/50 rounded p-2">
+                    <div class="text-red-200 font-semibold mb-1">除外エリア OCR</div>
+                    ${makeLines(trimList(dbg.excluded?.recognized), '除外')}
+                </div>
+                <div class="bg-green-900/30 border border-green-700/50 rounded p-2">
+                    <div class="text-green-200 font-semibold mb-1">計算エリア OCR</div>
+                    ${makeLines(trimList(dbg.included?.recognized), '計算')}
+                </div>
+            `;
+            resultTable.appendChild(debugDiv);
         }
     }
 });

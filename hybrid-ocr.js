@@ -252,17 +252,25 @@ export class LightweightHybridOCR {
      * 3エリア認識システム - 計算式の改善
      * エリア1: 音骸名前 / エリア2: 含めないステータス / エリア3: 含めるステータス
      */
-    async recognizeThreeAreas(imageCanvas, gameType) {
+    async recognizeThreeAreas(imageCanvas, gameType, areaOverride = null, options = {}) {
         const gameConfig = this.gameConfigs[gameType];
-        if (!gameConfig.three_area_recognition) {
+        if (!gameConfig.three_area_recognition && !areaOverride) {
             throw new Error(`3エリア認識設定が見つかりません: ${gameType}`);
         }
 
-        const areas = gameConfig.three_area_recognition;
+        const baseAreas = areaOverride || gameConfig.three_area_recognition;
+        const shouldScale = options.alreadyScaled ? false : options.autoScale !== false;
+        const areas = this.scaleAreasForImage(baseAreas, gameConfig, imageCanvas, shouldScale);
         const results = {
             itemName: { text: '', confidence: 0, area: 'item_name' },
             excludedStats: [], // 計算から除外するステータス
-            includedStats: []  // 計算に含めるステータス
+            includedStats: [],  // 計算に含めるステータス
+            debug: {
+                areasUsed: areas,
+                imageSize: { width: imageCanvas?.width, height: imageCanvas?.height },
+                excluded: {},
+                included: {}
+            }
         };
 
         console.log('🎯 3エリア認識を開始:', gameType);
@@ -300,7 +308,7 @@ export class LightweightHybridOCR {
 
             excludedCanvas = this.cvPreprocess(excludedCanvas, 'main');
 
-            const excludedResults = await this.recognizeStatArea(excludedCanvas, gameType, 'excluded');
+            const excludedResults = await this.recognizeStatArea(excludedCanvas, gameType, 'excluded', results.debug.excluded);
             results.excludedStats = excludedResults.map(stat => ({
                 ...stat,
                 area: 'excluded',
@@ -323,7 +331,7 @@ export class LightweightHybridOCR {
 
             includedCanvas = this.cvPreprocess(includedCanvas, 'sub');
 
-            const includedResults = await this.recognizeStatArea(includedCanvas, gameType, 'included');
+            const includedResults = await this.recognizeStatArea(includedCanvas, gameType, 'included', results.debug.included);
             results.includedStats = includedResults.map(stat => ({
                 ...stat,
                 area: 'included',
@@ -383,12 +391,18 @@ export class LightweightHybridOCR {
     /**
      * ステータスエリアの認識（エリア2・3専用）
      */
-    async recognizeStatArea(canvas, gameType, areaType) {
+    async recognizeStatArea(canvas, gameType, areaType, debugInfo = null) {
         const stats = [];
         
         // ステータス行を検出
         const statLines = await this.detectStatLines(canvas);
         console.log(`📊 ${areaType}エリアで${statLines.length}行のステータスを検出`);
+
+        if (debugInfo) {
+            debugInfo.lines = statLines.map(l => ({ ...l }));
+            debugInfo.canvas = { width: canvas.width, height: canvas.height };
+            debugInfo.recognized = [];
+        }
 
         for (let i = 0; i < statLines.length; i++) {
             const line = statLines[i];
@@ -398,14 +412,18 @@ export class LightweightHybridOCR {
                 const statResult = await this.recognizeStatLine(canvas, line, gameType);
                 
                 if (statResult && statResult.name && statResult.value) {
-                    stats.push({
+                    const statObj = {
                         name: statResult.name,
                         value: statResult.value,
                         confidence: statResult.confidence,
                         lineIndex: i,
                         area: areaType,
                         rawText: statResult.rawText
-                    });
+                    };
+                    stats.push(statObj);
+                    if (debugInfo) {
+                        debugInfo.recognized.push({ ...statObj });
+                    }
                     
                     console.log(`📈 ${areaType}[${i}]:`, statResult.name, '=', statResult.value);
                 }
@@ -644,6 +662,32 @@ export class LightweightHybridOCR {
             .replace(/[^0-9.,%+]/g, '') // 数値関連文字以外を除去
             .replace(/([0-9])([0-9])\.([0-9])/, '$1.$2$3') // 小数点位置修正
             .trim();
+    }
+
+    scaleAreasForImage(baseAreas, gameConfig, imageCanvas, shouldScale = true) {
+        if (!baseAreas) return null;
+        if (!shouldScale) return JSON.parse(JSON.stringify(baseAreas));
+
+        const baseRes = gameConfig?.base_resolution || {
+            width: imageCanvas?.width || 1,
+            height: imageCanvas?.height || 1
+        };
+        const imgW = imageCanvas?.width || baseRes.width;
+        const imgH = imageCanvas?.height || baseRes.height;
+        const scaleX = imgW / baseRes.width;
+        const scaleY = imgH / baseRes.height;
+        const scaleRect = (rect) => [
+            Math.round(rect[0] * scaleX),
+            Math.round(rect[1] * scaleY),
+            Math.round(rect[2] * scaleX),
+            Math.round(rect[3] * scaleY)
+        ];
+
+        return {
+            item_name_area: scaleRect(baseAreas.item_name_area),
+            excluded_stats_area: scaleRect(baseAreas.excluded_stats_area),
+            included_stats_area: scaleRect(baseAreas.included_stats_area)
+        };
     }
 
     scaleCanvas(canvas, scale) {
