@@ -12,14 +12,17 @@ export const GAME_CONFIGS = {
 
         // 3エリア認識の座標（1920x1080想定。必要に応じ調整してください）
         three_area_recognition: {
-            item_name_area: [800, 1920, 900, 1920],
-            excluded_stats_area: [0, 100, 0, 100],
-            included_stats_area: [0, 100, 0, 100]
+            // 音骸名前（右上タイトル付近）
+            item_name_area: [1210, 110, 600, 90],
+            // メインオプション（上段2行）
+            excluded_stats_area: [1210, 220, 600, 90],
+            // サブオプション（下段5行）
+            included_stats_area: [1210, 320, 600, 220]
         },
 
-        // 従来式は使用しないが、最低限の設定は保持
-        item_name_crop_area: [800, 1920, 900, 1920],
-        stats_crop_area: [960 - 400, 300, 800, 700],
+        // 従来式は使用しないが、最低限の設定は保持（未使用）
+        item_name_crop_area: [1210, 110, 600, 90],
+        stats_crop_area: [1210, 320, 600, 220],
         
         // OCR設定
         ocr_settings: {
