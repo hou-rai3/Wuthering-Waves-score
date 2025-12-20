@@ -256,35 +256,73 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- メイン処理（ハイブリッド方式） ---
+    // --- メイン処理（3エリア認識対応ハイブリッド方式） ---
     async function processAndDisplay() {
         if (!originalImage) return;
         resetResults();
         displayImage();
 
         const startTime = Date.now();
-        loaderText.textContent = 'ハイブリッドOCRで解析中...';
+        loaderText.textContent = '3エリア認識で解析中...';
         loaderOverlay.style.display = 'flex';
 
         try {
-            let recognizedStats = [];
+            let recognizedResult = null;
             let method = 'fallback';
             
-            if (hybridOCR && hybridOCR.isOpenCVReady) {
-                // ハイブリッド方式
-                method = 'hybrid';
-                recognizedStats = await hybridOCR.recognizeGameStats(imageCanvas, gameSelect.value);
-                loaderText.textContent = 'ハイブリッド認識完了...';
+            if (hybridOCR && hybridOCR.isOpenCVReady && currentConfig.three_area_recognition) {
+                // 3エリア認識システム
+                method = 'three_area_hybrid';
+                loaderText.textContent = '3エリア認識実行中...';
+                
+                recognizedResult = await hybridOCR.recognizeThreeAreas(imageCanvas, gameSelect.value);
+                
+                // 結果をレガシー形式に変換
+                if (recognizedResult) {
+                    recognizedResult.legacyStats = [
+                        ...recognizedResult.excludedStats.map(stat => ({
+                            ...stat,
+                            statName: stat.name,
+                            includeInCalculation: false
+                        })),
+                        ...recognizedResult.includedStats.map(stat => ({
+                            ...stat,
+                            statName: stat.name,
+                            includeInCalculation: true
+                        }))
+                    ];
+                    
+                    loaderText.textContent = `3エリア認識完了 (音骸: ${recognizedResult.itemName.text})...`;
+                    
+                    // 音骸名前の表示
+                    if (recognizedResult.itemName.text) {
+                        itemNameLabel.textContent = recognizedResult.itemName.text;
+                        itemNameLabel.className = recognizedResult.itemName.confidence > 0.7 ? 
+                            'text-green-400 font-medium' : 'text-yellow-400 font-medium';
+                    }
+                }
             } 
             
-            // フォールバック: 従来の方式
-            if (recognizedStats.length === 0) {
+            // ハイブリッド方式（フォールバック1）
+            if (!recognizedResult && hybridOCR && hybridOCR.isOpenCVReady) {
+                method = 'hybrid';
+                const recognizedStats = await hybridOCR.recognizeGameStats(imageCanvas, gameSelect.value);
+                if (recognizedStats.length > 0) {
+                    recognizedResult = { legacyStats: recognizedStats };
+                    loaderText.textContent = 'ハイブリッド認識完了...';
+                }
+            }
+            
+            // 従来方式（フォールバック2）
+            if (!recognizedResult || recognizedResult.legacyStats.length === 0) {
                 method = 'fallback';
-                recognizedStats = await fallbackRecognition();
+                const fallbackStats = await fallbackRecognition();
+                recognizedResult = { legacyStats: fallbackStats };
                 loaderText.textContent = '従来方式で認識完了...';
             }
 
             const processingTime = Date.now() - startTime;
+            const recognizedStats = recognizedResult.legacyStats || [];
             
             if (recognizedStats.length === 0) {
                 showNotification('ステータスを認識できませんでした。画像を確認してください。', 'error');
@@ -292,22 +330,33 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             
-            // スコア計算と表示
-            const statsForCalc = recognizedStats.map(stat => [stat.statName, stat.value]);
+            // スコア計算と表示（3エリア対応）
+            const statsForCalc = recognizedStats
+                .filter(stat => stat.includeInCalculation !== false)  // 除外フラグがない限り含める
+                .map(stat => [stat.statName, stat.value]);
+            
             const build = currentConfig.character_builds[characterSelect.value];
             const { total_score, scored_stats, formula } = calculateScore(statsForCalc, build);
             
-            displayResults(scored_stats, formula, total_score);
+            displayResults(scored_stats, formula, total_score, recognizedResult);
             
-            // 成功率の計算（認識できたスタッツ数/期待スタッツ数）
+            // 成功率の計算
             const expectedStats = Object.keys(build.sub || {}).length + Object.keys(build.main || {}).length;
             const accuracy = Math.min(recognizedStats.length / Math.max(expectedStats, 4), 1.0);
             
             recordPerformance(method, processingTime, accuracy);
             
-            // 低精度の警告
+            // 認識結果の品質評価
             const avgConfidence = recognizedStats.reduce((sum, s) => sum + (s.confidence || 0.5), 0) / recognizedStats.length;
-            if (avgConfidence < 0.7) {
+            
+            if (method === 'three_area_hybrid') {
+                const excludedCount = recognizedResult.excludedStats?.length || 0;
+                const includedCount = recognizedResult.includedStats?.length || 0;
+                showNotification(
+                    `3エリア認識完了 | 除外: ${excludedCount}個, 計算対象: ${includedCount}個 | 精度: ${Math.round(avgConfidence * 100)}%`, 
+                    avgConfidence > 0.8 ? 'success' : 'warning'
+                );
+            } else if (avgConfidence < 0.7) {
                 showNotification(`認識精度: ${Math.round(avgConfidence * 100)}% - 結果を確認してください`, 'warning');
             }
 
@@ -388,15 +437,43 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function drawBoundingBoxes() {
-        if(currentConfig.item_name_crop_area) {
-            ctx.strokeStyle = "red";
+        // 3エリア認識対応のバウンディングボックス
+        if (currentConfig.three_area_recognition) {
+            const areas = currentConfig.three_area_recognition;
+            
+            // エリア1: 音骸名前 (赤色)
+            ctx.strokeStyle = "#ff4444";
             ctx.lineWidth = 3;
-            ctx.strokeRect(...currentConfig.item_name_crop_area);
-        }
-        if(currentConfig.stats_crop_area) {
-            ctx.strokeStyle = "#FFD700";
+            ctx.strokeRect(areas.item_name_area[0], areas.item_name_area[1], areas.item_name_area[2], areas.item_name_area[3]);
+            
+            // エリア2: 除外ステータス (オレンジ色)
+            ctx.strokeStyle = "#ff8800";
             ctx.lineWidth = 3;
-            ctx.strokeRect(...currentConfig.stats_crop_area);
+            ctx.strokeRect(areas.excluded_stats_area[0], areas.excluded_stats_area[1], areas.excluded_stats_area[2], areas.excluded_stats_area[3]);
+            
+            // エリア3: 計算対象ステータス (緑色)
+            ctx.strokeStyle = "#44ff44";
+            ctx.lineWidth = 3;
+            ctx.strokeRect(areas.included_stats_area[0], areas.included_stats_area[1], areas.included_stats_area[2], areas.included_stats_area[3]);
+            
+            // エリアラベル表示
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "14px Arial";
+            ctx.fillText("音骸名前", areas.item_name_area[0], areas.item_name_area[1] - 5);
+            ctx.fillText("除外エリア", areas.excluded_stats_area[0], areas.excluded_stats_area[1] - 5);
+            ctx.fillText("計算エリア", areas.included_stats_area[0], areas.included_stats_area[1] - 5);
+        } else {
+            // 従来の表示方式
+            if (currentConfig.item_name_crop_area) {
+                ctx.strokeStyle = "red";
+                ctx.lineWidth = 3;
+                ctx.strokeRect(...currentConfig.item_name_crop_area);
+            }
+            if (currentConfig.stats_crop_area) {
+                ctx.strokeStyle = "#FFD700";
+                ctx.lineWidth = 3;
+                ctx.strokeRect(...currentConfig.stats_crop_area);
+            }
         }
     }
     
@@ -482,8 +559,47 @@ document.addEventListener('DOMContentLoaded', () => {
         scoreLabel.textContent = '0';
     }
 
-    function displayResults(scored_stats, formula, total_score) {
+    function displayResults(scored_stats, formula, total_score, recognizedResult = null) {
         resultTable.innerHTML = '';
+        
+        // 3エリア認識の場合、エリア別に表示を分ける
+        if (recognizedResult && (recognizedResult.excludedStats || recognizedResult.includedStats)) {
+            
+            // 除外ステータスがある場合はセパレータを表示
+            if (recognizedResult.excludedStats && recognizedResult.excludedStats.length > 0) {
+                const excludedHeader = document.createElement('div');
+                excludedHeader.className = 'grid grid-cols-3 gap-2 p-2 bg-red-900/30 border-l-4 border-red-500';
+                excludedHeader.innerHTML = `
+                    <span class="col-span-3 text-center text-red-300 font-bold text-sm">
+                        🚫 計算から除外 (${recognizedResult.excludedStats.length}個)
+                    </span>
+                `;
+                resultTable.appendChild(excludedHeader);
+                
+                recognizedResult.excludedStats.forEach(stat => {
+                    const row = document.createElement('div');
+                    row.className = 'grid grid-cols-3 gap-2 p-2 bg-red-900/10 opacity-60';
+                    row.innerHTML = `
+                        <span class="col-span-1 truncate line-through text-gray-400">${stat.name}</span>
+                        <span class="text-center font-mono text-gray-400">${stat.value}</span>
+                        <span class="text-right font-mono text-gray-500">除外</span>
+                    `;
+                    resultTable.appendChild(row);
+                });
+            }
+            
+            // 計算対象のセパレータ
+            const includedHeader = document.createElement('div');
+            includedHeader.className = 'grid grid-cols-3 gap-2 p-2 bg-green-900/30 border-l-4 border-green-500 mt-2';
+            includedHeader.innerHTML = `
+                <span class="col-span-3 text-center text-green-300 font-bold text-sm">
+                    ✅ スコア計算対象 (${scored_stats.length}個)
+                </span>
+            `;
+            resultTable.appendChild(includedHeader);
+        }
+        
+        // 計算されたステータスを表示
         scored_stats.forEach(stat => {
             const row = document.createElement('div');
             const scoreColorClass = stat.score > 10 ? 'text-[#FFD700]' : stat.score > 5 ? 'text-[#a0a0a0]' : 'text-[#666]';
@@ -497,7 +613,32 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             resultTable.appendChild(row);
         });
+        
         formulaLabel.textContent = `計算式: ${formula}`;
         scoreLabel.textContent = Math.round(total_score);
+        
+        // 3エリア認識の統計情報を表示
+        if (recognizedResult && (recognizedResult.excludedStats || recognizedResult.includedStats)) {
+            const statsInfo = document.createElement('div');
+            statsInfo.className = 'mt-2 p-2 bg-blue-900/20 border border-blue-500/30 rounded text-xs text-blue-300';
+            
+            const excludedCount = recognizedResult.excludedStats?.length || 0;
+            const includedCount = recognizedResult.includedStats?.length || 0;
+            const itemName = recognizedResult.itemName?.text || '認識できませんでした';
+            const nameConfidence = Math.round((recognizedResult.itemName?.confidence || 0) * 100);
+            
+            statsInfo.innerHTML = `
+                <div class="flex justify-between items-center">
+                    <span>📊 認識統計:</span>
+                    <span>除外 ${excludedCount}個 | 計算 ${includedCount}個</span>
+                </div>
+                <div class="flex justify-between items-center mt-1">
+                    <span>🏷️ 音骸名前:</span>
+                    <span class="${nameConfidence > 70 ? 'text-green-300' : 'text-yellow-300'}">${itemName} (${nameConfidence}%)</span>
+                </div>
+            `;
+            
+            resultTable.appendChild(statsInfo);
+        }
     }
 });

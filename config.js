@@ -5,8 +5,15 @@
 export const GAME_CONFIGS = {
     "鳴潮": {
         "title": "鳴潮 音骸スコア計算機",
-        "item_name_crop_area": [1380, 135, 420, 50], // [x, y, width, height] = [1380, 135, 1800-1380, 185-135]
-        "stats_crop_area": [1400,190, 500, 290], // [x, y, width, height] = [1400, 230, 1880-1400, 530-230]
+        "item_name_crop_area": [1380, 135, 420, 50], // [x, y, width, height] 音骸名前
+        "stats_crop_area": [1400,190, 500, 290], // [x, y, width, height] 全ステータス領域
+        
+        // ★★★ 3エリア認識システム ★★★
+        "three_area_recognition": {
+            "item_name_area": [1380, 135, 420, 50],      // 音骸名前エリア
+            "excluded_stats_area": [1400, 190, 500, 140], // 含めないステータス（上半分）
+            "included_stats_area": [1400, 330, 500, 160]  // 含めるステータス（下半分）
+        },
         "character_label": "① キャラクター:",
         "paste_label": "② ここに音骸のスクショをCtrl+V",
         "recognized_item_label": "--- 認識された音骸 ---",

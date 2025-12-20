@@ -200,8 +200,168 @@ export class LightweightHybridOCR {
     }
 
     /**
-     * 数値限定OCR - 精度重視
+     * 3エリア認識システム - 計算式の改善
+     * エリア1: 音骸名前 / エリア2: 含めないステータス / エリア3: 含めるステータス
      */
+    async recognizeThreeAreas(imageCanvas, gameType) {
+        const gameConfig = this.gameConfigs[gameType];
+        if (!gameConfig.three_area_recognition) {
+            throw new Error(`3エリア認識設定が見つかりません: ${gameType}`);
+        }
+
+        const areas = gameConfig.three_area_recognition;
+        const results = {
+            itemName: { text: '', confidence: 0, area: 'item_name' },
+            excludedStats: [], // 計算から除外するステータス
+            includedStats: []  // 計算に含めるステータス
+        };
+
+        console.log('🎯 3エリア認識を開始:', gameType);
+
+        // エリア1: 音骸名前の認識
+        try {
+            const itemNameCanvas = this.extractRegion(imageCanvas, {
+                x: areas.item_name_area[0],
+                y: areas.item_name_area[1], 
+                width: areas.item_name_area[2],
+                height: areas.item_name_area[3]
+            });
+
+            const itemNameResult = await this.recognizeItemName(itemNameCanvas, gameType);
+            results.itemName = {
+                text: itemNameResult.text || '',
+                confidence: itemNameResult.confidence || 0,
+                area: 'item_name'
+            };
+            
+            console.log('📝 音骸名前認識結果:', results.itemName);
+        } catch (error) {
+            console.warn('音骸名前認識エラー:', error);
+        }
+
+        // エリア2: 含めないステータス（除外エリア）
+        try {
+            const excludedCanvas = this.extractRegion(imageCanvas, {
+                x: areas.excluded_stats_area[0],
+                y: areas.excluded_stats_area[1],
+                width: areas.excluded_stats_area[2], 
+                height: areas.excluded_stats_area[3]
+            });
+
+            const excludedResults = await this.recognizeStatArea(excludedCanvas, gameType, 'excluded');
+            results.excludedStats = excludedResults.map(stat => ({
+                ...stat,
+                area: 'excluded',
+                includeInCalculation: false  // 計算から除外
+            }));
+            
+            console.log('🚫 除外ステータス:', results.excludedStats.length, '個');
+        } catch (error) {
+            console.warn('除外ステータス認識エラー:', error);
+        }
+
+        // エリア3: 含めるステータス（計算対象エリア）
+        try {
+            const includedCanvas = this.extractRegion(imageCanvas, {
+                x: areas.included_stats_area[0],
+                y: areas.included_stats_area[1],
+                width: areas.included_stats_area[2],
+                height: areas.included_stats_area[3]
+            });
+
+            const includedResults = await this.recognizeStatArea(includedCanvas, gameType, 'included');
+            results.includedStats = includedResults.map(stat => ({
+                ...stat,
+                area: 'included',
+                includeInCalculation: true  // 計算に含める
+            }));
+            
+            console.log('✅ 含めるステータス:', results.includedStats.length, '個');
+        } catch (error) {
+            console.warn('含めるステータス認識エラー:', error);
+        }
+
+        return results;
+    }
+
+    /**
+     * 音骸名前の認識（エリア1専用）
+     */
+    async recognizeItemName(canvas, gameType) {
+        // 音骸名前に特化した前処理
+        let processedCanvas = this.cloneCanvas(canvas);
+        
+        // 1. 3倍スケールアップ
+        processedCanvas = this.scaleCanvas(processedCanvas, 3.0);
+        
+        // 2. ゲーム固有の名前色抽出
+        processedCanvas = await this.extractItemNameColor(processedCanvas, gameType);
+        
+        // 3. 文字強調処理
+        processedCanvas = this.enhanceTextForName(processedCanvas);
+
+        // 音骸名前用のOCR設定
+        const ocrConfig = {
+            psm: 8, // 単語レベル
+            tessedit_char_whitelist: 'あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンー・'
+        };
+
+        try {
+            const { data: { text, confidence } } = await Tesseract.recognize(
+                processedCanvas,
+                'jpn',
+                { 
+                    logger: m => console.log('🔤', m.status, m.progress),
+                    ...ocrConfig 
+                }
+            );
+
+            return {
+                text: text.trim(),
+                confidence: confidence / 100
+            };
+        } catch (error) {
+            console.error('音骸名前OCRエラー:', error);
+            return { text: '', confidence: 0 };
+        }
+    }
+
+    /**
+     * ステータスエリアの認識（エリア2・3専用）
+     */
+    async recognizeStatArea(canvas, gameType, areaType) {
+        const stats = [];
+        
+        // ステータス行を検出
+        const statLines = await this.detectStatLines(canvas);
+        console.log(`📊 ${areaType}エリアで${statLines.length}行のステータスを検出`);
+
+        for (let i = 0; i < statLines.length; i++) {
+            const line = statLines[i];
+            
+            try {
+                // 各行からステータス名と値を抽出
+                const statResult = await this.recognizeStatLine(canvas, line, gameType);
+                
+                if (statResult && statResult.name && statResult.value) {
+                    stats.push({
+                        name: statResult.name,
+                        value: statResult.value,
+                        confidence: statResult.confidence,
+                        lineIndex: i,
+                        area: areaType,
+                        rawText: statResult.rawText
+                    });
+                    
+                    console.log(`📈 ${areaType}[${i}]:`, statResult.name, '=', statResult.value);
+                }
+            } catch (error) {
+                console.warn(`ステータス行${i}の認識エラー:`, error);
+            }
+        }
+
+        return stats;
+    }
     async recognizeNumericValue(imageCanvas, region, gameType) {
         // 数値領域を抽出
         const valueCanvas = this.extractRegion(imageCanvas, region.valueRect);
@@ -792,4 +952,282 @@ export class LightweightHybridOCR {
     }
 
     // その他のフィルター実装は省略（sharpen, backgroundRemoval, morphology等）
+
+    // ===================================================================
+    // 3エリア認識システム用の補助メソッド 
+    // ===================================================================
+
+    /**
+     * ステータス行の検出
+     */
+    async detectStatLines(canvas) {
+        const lines = [];
+        const ctx = canvas.getContext('2d');
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        const width = canvas.width;
+        const height = canvas.height;
+
+        // 水平方向の投影を計算（各行の文字密度）
+        const horizontalProjection = new Array(height).fill(0);
+        
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const idx = (y * width + x) * 4;
+                const gray = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+                
+                // 文字らしいピクセル（中程度の明度）をカウント
+                if (gray > 50 && gray < 200) {
+                    horizontalProjection[y]++;
+                }
+            }
+        }
+
+        // ピークを検出してステータス行を特定
+        const minLineHeight = 15;
+        const minTextDensity = width * 0.05; // 行幅の5%以上の文字密度
+        
+        let inLine = false;
+        let lineStart = 0;
+        
+        for (let y = 0; y < height; y++) {
+            const density = horizontalProjection[y];
+            
+            if (!inLine && density > minTextDensity) {
+                // 新しい行の開始
+                inLine = true;
+                lineStart = y;
+            } else if (inLine && density <= minTextDensity) {
+                // 行の終了
+                const lineHeight = y - lineStart;
+                
+                if (lineHeight >= minLineHeight) {
+                    lines.push({
+                        y: lineStart,
+                        height: lineHeight,
+                        x: 0,
+                        width: width,
+                        density: horizontalProjection.slice(lineStart, y).reduce((a, b) => a + b, 0)
+                    });
+                }
+                
+                inLine = false;
+            }
+        }
+
+        return lines.sort((a, b) => b.density - a.density); // 密度順でソート
+    }
+
+    /**
+     * 単一ステータス行の認識
+     */
+    async recognizeStatLine(canvas, line, gameType) {
+        // 行領域を抽出
+        const lineCanvas = this.extractRegion(canvas, line);
+        
+        // 行を左右に分割（ステータス名 | 数値）
+        const nameWidth = Math.floor(lineCanvas.width * 0.6);  // 60%がステータス名
+        const valueWidth = lineCanvas.width - nameWidth;        // 40%が数値
+        
+        // ステータス名部分
+        const nameCanvas = this.extractRegion(lineCanvas, {
+            x: 0, y: 0, width: nameWidth, height: lineCanvas.height
+        });
+        
+        // 数値部分  
+        const valueCanvas = this.extractRegion(lineCanvas, {
+            x: nameWidth, y: 0, width: valueWidth, height: lineCanvas.height
+        });
+
+        // 並行してOCR実行
+        const [nameResult, valueResult] = await Promise.all([
+            this.recognizeStatName(nameCanvas, gameType),
+            this.recognizeStatValue(valueCanvas, gameType)
+        ]);
+
+        return {
+            name: nameResult.text,
+            value: valueResult.value,
+            confidence: Math.min(nameResult.confidence, valueResult.confidence),
+            rawText: `${nameResult.text} ${valueResult.value}`
+        };
+    }
+
+    /**
+     * ステータス名の認識
+     */
+    async recognizeStatName(canvas, gameType) {
+        let processedCanvas = this.cloneCanvas(canvas);
+        
+        // ステータス名用の前処理
+        processedCanvas = this.scaleCanvas(processedCanvas, 2.5);
+        processedCanvas = await this.extractStatNameColor(processedCanvas, gameType);
+        
+        const gameConfig = this.gameConfigs[gameType];
+        const ocrConfig = {
+            psm: 8,
+            tessedit_char_whitelist: gameConfig.ocr_settings.tesseract_config.tessedit_char_whitelist
+        };
+
+        try {
+            const { data: { text, confidence } } = await Tesseract.recognize(
+                processedCanvas,
+                'jpn',
+                ocrConfig
+            );
+
+            return {
+                text: this.normalizeStatName(text.trim(), gameType),
+                confidence: confidence / 100
+            };
+        } catch (error) {
+            console.warn('ステータス名OCRエラー:', error);
+            return { text: '', confidence: 0 };
+        }
+    }
+
+    /**
+     * ステータス値の認識
+     */
+    async recognizeStatValue(canvas, gameType) {
+        let processedCanvas = this.cloneCanvas(canvas);
+        
+        // 数値用の前処理
+        processedCanvas = await this.numericPreprocessing(processedCanvas, gameType);
+        
+        const ocrConfig = {
+            psm: 7,
+            tessedit_char_whitelist: '0123456789.,%+'
+        };
+
+        try {
+            const { data: { text, confidence } } = await Tesseract.recognize(
+                processedCanvas,
+                'eng',
+                ocrConfig
+            );
+
+            return {
+                value: this.normalizeNumericText(text.trim()),
+                confidence: confidence / 100
+            };
+        } catch (error) {
+            console.warn('ステータス値OCRエラー:', error);
+            return { value: '', confidence: 0 };
+        }
+    }
+
+    /**
+     * 音骸名前の色抽出
+     */
+    async extractItemNameColor(canvas, gameType) {
+        const ctx = canvas.getContext('2d');
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1]; 
+            const b = data[i + 2];
+            const [h, s, v] = this.rgbToHsv(r, g, b);
+
+            let isItemName = false;
+            
+            if (gameType === '鳴潮') {
+                // 音骸名前は通常、金色または白色
+                isItemName = (
+                    (h >= 40 && h <= 60 && s > 50 && v > 60) ||  // 金色
+                    (s < 30 && v > 180)                          // 白色
+                );
+            } else if (gameType === '原神') {
+                // 聖遺物名は橙色系
+                isItemName = (h >= 20 && h <= 40 && s > 60 && v > 120);
+            }
+
+            if (isItemName) {
+                data[i] = 255;     // 白に変換
+                data[i + 1] = 255;
+                data[i + 2] = 255;
+            } else {
+                data[i] = 0;       // 黒に変換
+                data[i + 1] = 0;
+                data[i + 2] = 0;
+            }
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+        return canvas;
+    }
+
+    /**
+     * ステータス名の色抽出
+     */
+    async extractStatNameColor(canvas, gameType) {
+        const ctx = canvas.getContext('2d');
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+            const [h, s, v] = this.rgbToHsv(r, g, b);
+
+            let isStatName = false;
+            
+            if (gameType === '鳴潮') {
+                // ステータス名は白色系
+                isStatName = (s < 40 && v > 140);
+            }
+
+            if (isStatName) {
+                data[i] = 255;
+                data[i + 1] = 255;
+                data[i + 2] = 255;
+            } else {
+                data[i] = 0;
+                data[i + 1] = 0;
+                data[i + 2] = 0;
+            }
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+        return canvas;
+    }
+
+    /**
+     * 文字強調処理（名前用）
+     */
+    enhanceTextForName(canvas) {
+        // モルフォロジー処理で文字を太くする
+        if (this.isOpenCVReady) {
+            return this.morphologyClose(canvas, 2);
+        } else {
+            // フォールバック: シンプルなぼかし
+            return this.gaussianBlur(canvas, 1.0);
+        }
+    }
+
+    /**
+     * ステータス名の正規化
+     */
+    normalizeStatName(text, gameType) {
+        const gameConfig = this.gameConfigs[gameType];
+        if (!gameConfig || !gameConfig.stat_map) return text;
+        
+        // stat_mapを使用して名前を正規化
+        const normalized = gameConfig.stat_map[text];
+        return normalized || text;
+    }
+
+    /**
+     * Gaussian blur実装（フォールバック用）
+     */
+    gaussianBlur(canvas, sigma) {
+        const ctx = canvas.getContext('2d');
+        ctx.filter = `blur(${sigma}px)`;
+        ctx.drawImage(canvas, 0, 0);
+        ctx.filter = 'none';
+        return canvas;
+    }
 }
