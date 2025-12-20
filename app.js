@@ -312,11 +312,14 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // スコア計算と表示（3エリア対応）
             const statsForCalc = recognizedStats
-                .filter(stat => stat.includeInCalculation !== false)  // 除外フラグがない限り含める
-                .map(stat => [stat.statName, stat.value]);
-            
+                .filter(stat => stat.includeInCalculation !== false)  // 計算対象のみ（含めるエリア）
+                .map(stat => {
+                    const key = stat.value.includes('%') ? `${stat.statName}(%)` : `${stat.statName}(実数値)`;
+                    return [key, stat.value];
+                });
+
             const build = currentConfig.character_builds[characterSelect.value];
-            const { total_score, scored_stats, formula } = calculateScore(statsForCalc, build);
+            const { total_score, scored_stats, formula } = calculateScore(statsForCalc, build, recognizedResult);
             
             displayResults(scored_stats, formula, total_score, recognizedResult);
             
@@ -478,35 +481,51 @@ document.addEventListener('DOMContentLoaded', () => {
         return statsForCalc;
     }
 
-    function calculateScore(stats, build) {
+    function calculateScore(stats, build, recognizedResult = null) {
+        // ビルド未定義でも計算が落ちないようにガード
+        build = build || { main: {}, sub: {} };
         let total_score = 0;
         let scored_stats = [];
         let formula_parts = [];
 
         const mainMult = build.main || {};
         const subMult = build.sub || {};
-
-        stats.forEach((stat, i) => {
-            const [key, valueStr] = stat;
-            let current_score = 0;
-            let tag = 'sub';
-
-            if (i === 0 && gameSelect.value === "鳴潮") { 
-                tag = 'main';
-                if (mainMult[key] > 0) {
-                    current_score = 15.0;
+        // メイン: 除外エリアから一致するメイン効果を探して 15 × 倍率
+        let main_score = 0;
+        let main_applied = false;
+        if (recognizedResult && recognizedResult.excludedStats && Object.keys(mainMult).length > 0) {
+            for (const stat of recognizedResult.excludedStats) {
+                // 候補キー（％/実数の派生を考慮）
+                const baseName = stat.name;
+                const valueStr = stat.value || '';
+                const nameWithSuffix = valueStr.includes('%') ? `${baseName}(%)` : `${baseName}(実数値)`;
+                const candidates = [baseName, nameWithSuffix];
+                for (const cand of candidates) {
+                    if (mainMult[cand] !== undefined) {
+                        const mult = mainMult[cand] || 0;
+                        main_score = 15 * mult;
+                        total_score += main_score;
+                        formula_parts.push(`15×${mult}`);
+                        scored_stats.push({ name: cand, value: valueStr || '-', score: main_score, tag: 'main' });
+                        main_applied = true;
+                        break;
+                    }
                 }
-            } else {
-                const numericValue = parseFloat(valueStr.replace('%', '').replace(',', '')) || 0;
-                const multiplier = subMult[key] || 0;
-                current_score = numericValue * multiplier;
+                if (main_applied) break;
             }
-            
+        }
+
+        // サブ: 先頭から5件まで、値 × 倍率
+        const limitedStats = stats.slice(0, 5);
+        limitedStats.forEach(([key, valueStr]) => {
+            const numericValue = parseFloat(valueStr.replace('%', '').replace(',', '')) || 0;
+            const multiplier = subMult[key] || 0;
+            const current_score = numericValue * multiplier;
             total_score += current_score;
             if (current_score > 0.001) {
-                formula_parts.push(current_score.toFixed(2));
+                formula_parts.push(`${numericValue}×${multiplier}`);
             }
-            scored_stats.push({ name: key, value: valueStr, score: current_score, tag });
+            scored_stats.push({ name: key, value: valueStr, score: current_score, tag: 'sub' });
         });
 
         const formula = formula_parts.length > 0 ? formula_parts.join(" + ") + ` = ${total_score.toFixed(2)}` : '計算対象ステータスがありません';
