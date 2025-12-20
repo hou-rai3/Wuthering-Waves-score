@@ -12,9 +12,9 @@ export const GAME_CONFIGS = {
 
         // 3エリア認識の座標（1920x1080想定。必要に応じ調整してください）
         three_area_recognition: {
-            item_name_area: [240, 120, 240, 120],
-            excluded_stats_area: [200, 320, 600, 600],
-            included_stats_area: [200, 320, 200, 600]
+            item_name_area: [0, 100, 0, 100],
+            excluded_stats_area: [0, 100, 0, 100],
+            included_stats_area: [0, 100, 0, 100]
         },
 
         // 従来式は使用しないが、最低限の設定は保持
