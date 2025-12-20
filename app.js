@@ -24,6 +24,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultTable = document.getElementById('result-table');
     const formulaLabel = document.getElementById('formula-label');
     const scoreLabel = document.getElementById('score-label');
+    const areaInputs = {
+        name: {
+            x: document.getElementById('area-name-x'),
+            y: document.getElementById('area-name-y'),
+            w: document.getElementById('area-name-w'),
+            h: document.getElementById('area-name-h'),
+        },
+        main: {
+            x: document.getElementById('area-main-x'),
+            y: document.getElementById('area-main-y'),
+            w: document.getElementById('area-main-w'),
+            h: document.getElementById('area-main-h'),
+        },
+        sub: {
+            x: document.getElementById('area-sub-x'),
+            y: document.getElementById('area-sub-y'),
+            w: document.getElementById('area-sub-w'),
+            h: document.getElementById('area-sub-h'),
+        },
+        applyBtn: document.getElementById('apply-area-btn'),
+        resetBtn: document.getElementById('reset-area-btn'),
+    };
 
     // --- アプリケーションの状態管理 ---
     let originalImage = null;
@@ -137,6 +159,88 @@ document.addEventListener('DOMContentLoaded', () => {
         gameSelect.value = Object.keys(GAME_CONFIGS)[0];
         onGameChange();
         setupDragAndDrop();
+
+        // 座標入力の初期値とイベント
+        syncAreaInputsFromConfig();
+        setupAreaInputHandlers();
+    }
+
+    function setupAreaInputHandlers() {
+        if (!areaInputs.applyBtn) return;
+        areaInputs.applyBtn.addEventListener('click', () => {
+            if (!currentConfig || !currentConfig.three_area_recognition) return;
+            const t = currentConfig.three_area_recognition;
+            const parse = (el, fallback) => {
+                const v = parseInt(el.value, 10);
+                return Number.isFinite(v) ? v : fallback;
+            };
+            t.item_name_area = [
+                parse(areaInputs.name.x, t.item_name_area[0]),
+                parse(areaInputs.name.y, t.item_name_area[1]),
+                parse(areaInputs.name.w, t.item_name_area[2]),
+                parse(areaInputs.name.h, t.item_name_area[3]),
+            ];
+            t.excluded_stats_area = [
+                parse(areaInputs.main.x, t.excluded_stats_area[0]),
+                parse(areaInputs.main.y, t.excluded_stats_area[1]),
+                parse(areaInputs.main.w, t.excluded_stats_area[2]),
+                parse(areaInputs.main.h, t.excluded_stats_area[3]),
+            ];
+            t.included_stats_area = [
+                parse(areaInputs.sub.x, t.included_stats_area[0]),
+                parse(areaInputs.sub.y, t.included_stats_area[1]),
+                parse(areaInputs.sub.w, t.included_stats_area[2]),
+                parse(areaInputs.sub.h, t.included_stats_area[3]),
+            ];
+            saveAreaToLocalStorage(t);
+            displayImage();
+        });
+        if (areaInputs.resetBtn) {
+            areaInputs.resetBtn.addEventListener('click', () => {
+                if (!currentConfig) return;
+                // デフォルトをconfig.jsから再読込（ゲーム再選択で反映）
+                onGameChange();
+                localStorage.removeItem('three_area_overrides');
+            });
+        }
+    }
+
+    function syncAreaInputsFromConfig() {
+        if (!currentConfig || !currentConfig.three_area_recognition) return;
+        const t = currentConfig.three_area_recognition;
+        if (!t) return;
+        const setVal = (el, v) => { if (el) el.value = v; };
+        setVal(areaInputs.name.x, t.item_name_area[0]);
+        setVal(areaInputs.name.y, t.item_name_area[1]);
+        setVal(areaInputs.name.w, t.item_name_area[2]);
+        setVal(areaInputs.name.h, t.item_name_area[3]);
+        setVal(areaInputs.main.x, t.excluded_stats_area[0]);
+        setVal(areaInputs.main.y, t.excluded_stats_area[1]);
+        setVal(areaInputs.main.w, t.excluded_stats_area[2]);
+        setVal(areaInputs.main.h, t.excluded_stats_area[3]);
+        setVal(areaInputs.sub.x, t.included_stats_area[0]);
+        setVal(areaInputs.sub.y, t.included_stats_area[1]);
+        setVal(areaInputs.sub.w, t.included_stats_area[2]);
+        setVal(areaInputs.sub.h, t.included_stats_area[3]);
+    }
+
+    function saveAreaToLocalStorage(t) {
+        try {
+            localStorage.setItem('three_area_overrides', JSON.stringify(t));
+        } catch (e) {
+            console.warn('座標の保存に失敗:', e);
+        }
+    }
+
+    function loadAreaFromLocalStorage() {
+        try {
+            const raw = localStorage.getItem('three_area_overrides');
+            if (!raw) return null;
+            return JSON.parse(raw);
+        } catch (e) {
+            console.warn('座標の読込に失敗:', e);
+            return null;
+        }
     }
 
     function createPerformanceButton() {
@@ -193,6 +297,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const gameName = gameSelect.value;
         currentConfig = GAME_CONFIGS[gameName];
 
+        // ローカル保存された座標を適用
+        const saved = loadAreaFromLocalStorage();
+        if (saved && saved.item_name_area) {
+            currentConfig.three_area_recognition = saved;
+        }
+
         document.title = currentConfig.title;
         charLabel.textContent = currentConfig.character_label;
         pasteLabel.textContent = currentConfig.paste_label;
@@ -212,6 +322,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         resetResults();
         processAndDisplay();
+
+        // 入力欄を最新座標に同期
+        syncAreaInputsFromConfig();
     }
 
     // --- 画像処理関連 ---
