@@ -40,6 +40,8 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             hybridOCR = new LightweightHybridOCR();
             await hybridOCR.initializeSystem();
+            // ゲーム設定をOCRシステムへ紐付け（鳴潮専用化）
+            hybridOCR.gameConfigs = GAME_CONFIGS;
             console.log('Lightweight OCR System ready');
         } catch (error) {
             console.error('OCR initialization failed:', error);
@@ -266,59 +268,37 @@ document.addEventListener('DOMContentLoaded', () => {
         loaderText.textContent = '3エリア認識で解析中...';
         loaderOverlay.style.display = 'flex';
 
+        // 鳴潮専用・3エリア認識のみを使用
+        let method = 'three_area_hybrid';
         try {
             let recognizedResult = null;
-            let method = 'fallback';
-            
-            if (hybridOCR && hybridOCR.isOpenCVReady && currentConfig.three_area_recognition) {
-                // 3エリア認識システム
-                method = 'three_area_hybrid';
-                loaderText.textContent = '3エリア認識実行中...';
+            loaderText.textContent = '3エリア認識実行中...';
+
+            recognizedResult = await hybridOCR.recognizeThreeAreas(imageCanvas, '鳴潮');
+
+            // 結果をレガシー形式に変換
+            if (recognizedResult) {
+                recognizedResult.legacyStats = [
+                    ...recognizedResult.excludedStats.map(stat => ({
+                        ...stat,
+                        statName: stat.name,
+                        includeInCalculation: false
+                    })),
+                    ...recognizedResult.includedStats.map(stat => ({
+                        ...stat,
+                        statName: stat.name,
+                        includeInCalculation: true
+                    }))
+                ];
                 
-                recognizedResult = await hybridOCR.recognizeThreeAreas(imageCanvas, gameSelect.value);
+                loaderText.textContent = `3エリア認識完了 (音骸: ${recognizedResult.itemName.text})...`;
                 
-                // 結果をレガシー形式に変換
-                if (recognizedResult) {
-                    recognizedResult.legacyStats = [
-                        ...recognizedResult.excludedStats.map(stat => ({
-                            ...stat,
-                            statName: stat.name,
-                            includeInCalculation: false
-                        })),
-                        ...recognizedResult.includedStats.map(stat => ({
-                            ...stat,
-                            statName: stat.name,
-                            includeInCalculation: true
-                        }))
-                    ];
-                    
-                    loaderText.textContent = `3エリア認識完了 (音骸: ${recognizedResult.itemName.text})...`;
-                    
-                    // 音骸名前の表示
-                    if (recognizedResult.itemName.text) {
-                        itemNameLabel.textContent = recognizedResult.itemName.text;
-                        itemNameLabel.className = recognizedResult.itemName.confidence > 0.7 ? 
-                            'text-green-400 font-medium' : 'text-yellow-400 font-medium';
-                    }
+                // 音骸名前の表示
+                if (recognizedResult.itemName.text) {
+                    itemNameLabel.textContent = recognizedResult.itemName.text;
+                    itemNameLabel.className = recognizedResult.itemName.confidence > 0.7 ? 
+                        'text-green-400 font-medium' : 'text-yellow-400 font-medium';
                 }
-            } 
-            
-            // ハイブリッド方式（フォールバック1）
-            if (!recognizedResult && hybridOCR && hybridOCR.isOpenCVReady) {
-                method = 'hybrid';
-                const recognizedStats = await hybridOCR.recognizeGameStats(imageCanvas, gameSelect.value);
-                if (recognizedStats.length > 0) {
-                    recognizedResult = { legacyStats: recognizedStats };
-                    loaderText.textContent = 'ハイブリッド認識完了...';
-                }
-            }
-            
-            // 従来方式（フォールバック2）
-            if (!recognizedResult || recognizedResult.legacyStats.length === 0) {
-                method = 'fallback';
-                const fallbackStats = await fallbackRecognition();
-                recognizedResult = { legacyStats: fallbackStats };
-                loaderText.textContent = '従来方式で認識完了...';
             }
 
             const processingTime = Date.now() - startTime;
@@ -372,25 +352,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function fallbackRecognition() {
-        // 従来のOCR処理（フォールバック）
-        const statsCropArea = currentConfig.stats_crop_area;
-        const processedCanvas = await simplePreprocess(originalImage, statsCropArea, currentConfig.ocr_settings);
-        
-        const { data: { text } } = await Tesseract.recognize(
-            processedCanvas, 
-            'jpn', 
-            currentConfig.ocr_settings.tesseract_config
-        );
-        
-        const parsedStats = parseStats(text);
-        return parsedStats.map(([key, value]) => ({
-            statName: key,
-            value: value,
-            confidence: 0.6,
-            method: 'fallback'
-        }));
-    }
+    // 鳴潮専用化のため、従来方式フォールバックは削除
 
     async function simplePreprocess(img, crop, settings) {
         // 従来の前処理（軽量版）
