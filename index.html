@@ -3,21 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web版 装備スコア計算機</title>
+    <title>軽量版 ゲーム装備スコア計算機</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/fuse.js/dist/fuse.min.js"></script>
     <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+    <script src="https://docs.opencv.org/4.5.0/opencv.js" async></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=BIZ+UDGothic:wght@400;700&family=BIZ+UDPGothic:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <meta name="description" content="鳴潮・原神・スターレイル対応の高精度ゲーム装備スコア計算機。OpenCV.js + テンプレートマッチング搭載">
+    <meta name="keywords" content="鳴潮,原神,スターレイル,OCR,装備スコア,計算機">
 </head>
 <body class="bg-[#121212] text-[#e0e0e0]">
 
-    <div class="container mx-auto p-4 max-w-3xl min-h-screen flex items-center justify-center">
+    <!-- プログレスバー -->
+    <div id="loading-progress" class="fixed top-0 left-0 w-full h-1 bg-gray-800 z-50 hidden">
+        <div class="h-full bg-gradient-to-r from-[#FFD700] to-[#FFA500] transition-all duration-300" style="width: 0%"></div>
+    </div>
+
+    <div class="container mx-auto p-4 max-w-4xl min-h-screen flex items-center justify-center">
         <div class="w-full bg-black/60 backdrop-blur-sm shadow-2xl border border-[#444]/50 p-6">
             
-            <div class="flex flex-wrap items-start gap-4 mb-4">
+            <!-- ヘッダー -->
+            <div class="text-center mb-6">
+                <h1 class="text-2xl font-bold text-[#FFD700] mb-2">軽量版 ゲーム装備スコア計算機</h1>
+                <p class="text-sm text-gray-400">高精度OCR + テンプレートマッチング搭載</p>
+                <div class="mt-2">
+                    <span id="system-status" class="inline-block px-3 py-1 bg-gray-700 text-white text-xs rounded">
+                        システム初期化中...
+                    </span>
+                </div>
+            </div>
+            
+            <!-- 設定パネル -->
+            <div class="flex flex-wrap items-start gap-4 mb-4 bg-black/30 p-4 rounded">
                 <div class="flex items-center">
                     <label for="game-select" class="font-bold mr-2 text-[#DAA520]">★ ゲーム:</label>
                     <select id="game-select" class="p-2 shadow-sm"></select>
@@ -26,40 +46,141 @@
                     <label id="character-label" for="character-select" class="font-bold mr-2 text-[#DAA520]">① ビルド:</label>
                     <select id="character-select" class="p-2 shadow-sm"></select>
                 </div>
+                <div class="flex items-center ml-auto">
+                    <label class="text-xs text-gray-400 mr-2">認識モード:</label>
+                    <select id="ocr-mode" class="p-1 text-xs bg-gray-800 border border-gray-600 text-white rounded">
+                        <option value="auto">自動選択</option>
+                        <option value="hybrid">ハイブリッド優先</option>
+                        <option value="fallback">従来方式</option>
+                    </select>
+                </div>
             </div>
 
+            <!-- 画像エリア -->
             <div id="canvas-container" class="relative w-full h-80 bg-black/50 border-2 border-dashed border-[#555] flex justify-center items-center mb-4 overflow-hidden transition-all duration-300">
                 <canvas id="image-canvas" class="hidden"></canvas>
                 <div id="info-overlay" class="text-center text-gray-400">
                     <p id="paste-label" class="text-lg font-bold">ここにスクリーンショットを Ctrl+V</p>
                     <p class="text-sm">(または画像をドラッグ＆ドロップ)</p>
+                    <div class="mt-4 text-xs text-gray-500">
+                        <p>📍 対応ゲーム: 鳴潮 | 原神 | 崩壊：スターレイル</p>
+                        <p>🔍 高精度OCR + テンプレートマッチング</p>
+                    </div>
                 </div>
                 <div id="loader-overlay" class="absolute inset-0 bg-black/80 flex-col justify-center items-center hidden">
                     <div class="loader mb-2"></div>
-                    <p id="loader-text" class="text-[#FFD700] font-semibold">OCRでステータスを認識中...</p>
+                    <p id="loader-text" class="text-[#FFD700] font-semibold">処理中...</p>
+                    <div id="loader-progress" class="w-48 bg-gray-700 rounded-full h-2 mt-2">
+                        <div class="bg-gradient-to-r from-[#FFD700] to-[#FFA500] h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
                 </div>
             </div>
 
-            <div class="flex items-center mb-4">
-                <input type="checkbox" id="show-processed-check">
-                <label for="show-processed-check" class="ml-2 block text-sm text-gray-400">処理後画像を表示 (デバッグ用)</label>
+            <!-- オプション -->
+            <div class="flex items-center justify-between mb-4 text-sm">
+                <div class="flex items-center gap-4">
+                    <label class="flex items-center">
+                        <input type="checkbox" id="show-processed-check" class="mr-2">
+                        <span class="text-gray-400">処理後画像を表示</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="checkbox" id="show-confidence-check" class="mr-2">
+                        <span class="text-gray-400">信頼度を表示</span>
+                    </label>
+                </div>
+                <div class="text-xs text-gray-500">
+                    <span id="processing-time">処理時間: --ms</span>
+                </div>
             </div>
 
+            <!-- 結果表示エリア -->
             <div class="bg-black/40 p-4 border border-[#333]">
                 <h3 id="item-name-title-label" class="text-center font-bold text-lg mb-1 text-gray-400 tracking-widest">--- 認識された装備 ---</h3>
                 <p id="item-name-label" class="text-center text-xl font-semibold text-[#FFD700] mb-4">...</p>
-                <div id="result-table" class="space-y-1 text-sm"></div>
+                
+                <!-- ステータス結果テーブル -->
+                <div id="result-table" class="space-y-1 text-sm mb-4"></div>
+                
+                <!-- スコア表示 -->
                 <div class="mt-4">
-                    <p id="formula-label" class="text-xs text-gray-500 text-center">計算式:</p>
-                    <div id="score-label" class="text-center text-5xl font-bold bg-gradient-to-br from-[#444] to-[#222] border border-[#555] text-white p-3 mt-1 shadow-lg">0</div>
+                    <p id="formula-label" class="text-xs text-gray-500 text-center mb-2">計算式:</p>
+                    <div class="relative">
+                        <div id="score-label" class="text-center text-5xl font-bold bg-gradient-to-br from-[#444] to-[#222] border border-[#555] text-white p-3 shadow-lg">0</div>
+                        <div id="score-badge" class="absolute -top-2 -right-2 bg-green-600 text-white text-xs px-2 py-1 rounded hidden">
+                            高精度
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- アクションボタン -->
+                <div class="flex gap-2 mt-4 justify-center">
+                    <button id="retry-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm hidden">
+                        再認識
+                    </button>
+                    <button id="share-btn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm hidden">
+                        結果をコピー
+                    </button>
                 </div>
             </div>
         </div>
+        
+        <!-- フッター -->
         <footer class="fixed bottom-2 right-4 text-xs text-white/30">
-            <p>Web版 装備スコア計算機</p>
+            <p>軽量版 高精度OCR対応</p>
         </footer>
     </div>
 
+    <!-- 初期化完了のトースト -->
+    <div id="init-toast" class="fixed top-4 left-4 bg-green-600 text-white p-3 rounded shadow-lg z-40 hidden">
+        <div class="flex items-center">
+            <span class="mr-2">✅</span>
+            <div>
+                <p class="font-semibold">システム準備完了</p>
+                <p class="text-xs">高精度OCR機能が利用可能です</p>
+            </div>
+        </div>
+    </div>
+
     <script type="module" src="app.js"></script>
+    
+    <script>
+        // システム状態の更新
+        window.addEventListener('load', () => {
+            const statusElement = document.getElementById('system-status');
+            
+            // OpenCV.jsの準備状況をチェック
+            function checkSystemStatus() {
+                if (typeof cv !== 'undefined' && cv.Mat) {
+                    statusElement.textContent = '高精度OCR準備完了';
+                    statusElement.className = 'inline-block px-3 py-1 bg-green-600 text-white text-xs rounded';
+                    
+                    // 成功トースト表示
+                    const toast = document.getElementById('init-toast');
+                    toast.classList.remove('hidden');
+                    setTimeout(() => toast.classList.add('hidden'), 3000);
+                } else {
+                    statusElement.textContent = '基本OCRモード';
+                    statusElement.className = 'inline-block px-3 py-1 bg-yellow-600 text-white text-xs rounded';
+                }
+            }
+            
+            // 定期的にチェック
+            const checkInterval = setInterval(() => {
+                checkSystemStatus();
+                if (typeof cv !== 'undefined' && cv.Mat) {
+                    clearInterval(checkInterval);
+                }
+            }, 1000);
+            
+            // 5秒後にタイムアウト
+            setTimeout(() => {
+                clearInterval(checkInterval);
+                if (statusElement.textContent === 'システム初期化中...') {
+                    statusElement.textContent = '基本OCRモード';
+                    statusElement.className = 'inline-block px-3 py-1 bg-orange-600 text-white text-xs rounded';
+                }
+            }, 10000);
+        });
+    </script>
 </body>
 </html>
