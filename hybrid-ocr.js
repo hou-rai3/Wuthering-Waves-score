@@ -21,6 +21,55 @@ export class LightweightHybridOCR {
         console.log('Lightweight Hybrid OCR System initialized');
     }
 
+    /**
+     * OpenCVベースの前処理: グレースケール → CLAHE → ブラー → 適応的2値化 → 反転
+     * type: 'name' | 'main' | 'sub' でパラメータを少し調整
+     */
+    cvPreprocess(canvas, type = 'sub') {
+        if (!this.isOpenCVReady) return canvas;
+
+        const src = cv.imread(canvas);
+        const gray = new cv.Mat();
+        cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+
+        const clahe = new cv.CLAHE(2.0, new cv.Size(8, 8));
+        const claheOut = new cv.Mat();
+        clahe.apply(gray, claheOut);
+        clahe.delete();
+
+        const blurred = new cv.Mat();
+        cv.GaussianBlur(claheOut, blurred, new cv.Size(3, 3), 0, 0, cv.BORDER_DEFAULT);
+
+        const binary = new cv.Mat();
+        const blockSize = type === 'name' ? 15 : type === 'main' ? 21 : 25;
+        const C = type === 'name' ? 8 : type === 'main' ? 10 : 12;
+        cv.adaptiveThreshold(
+            blurred,
+            binary,
+            255,
+            cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv.THRESH_BINARY_INV,
+            blockSize,
+            C
+        );
+
+        // 文字を黒、背景を白に揃える
+        const inverted = new cv.Mat();
+        cv.bitwise_not(binary, inverted);
+
+        const dstCanvas = document.createElement('canvas');
+        cv.imshow(dstCanvas, inverted);
+
+        src.delete();
+        gray.delete();
+        claheOut.delete();
+        blurred.delete();
+        binary.delete();
+        inverted.delete();
+
+        return dstCanvas;
+    }
+
     async loadOpenCV() {
         return new Promise((resolve) => {
             if (typeof cv !== 'undefined') {
@@ -227,7 +276,8 @@ export class LightweightHybridOCR {
                 height: areas.item_name_area[3]
             });
 
-            const itemNameResult = await this.recognizeItemName(itemNameCanvas, gameType);
+            const preprocessedName = this.cvPreprocess(itemNameCanvas, 'name');
+            const itemNameResult = await this.recognizeItemName(preprocessedName, gameType);
             results.itemName = {
                 text: itemNameResult.text || '',
                 confidence: itemNameResult.confidence || 0,
@@ -241,12 +291,14 @@ export class LightweightHybridOCR {
 
         // エリア2: 含めないステータス（除外エリア）
         try {
-            const excludedCanvas = this.extractRegion(imageCanvas, {
+            let excludedCanvas = this.extractRegion(imageCanvas, {
                 x: areas.excluded_stats_area[0],
                 y: areas.excluded_stats_area[1],
                 width: areas.excluded_stats_area[2], 
                 height: areas.excluded_stats_area[3]
             });
+
+            excludedCanvas = this.cvPreprocess(excludedCanvas, 'main');
 
             const excludedResults = await this.recognizeStatArea(excludedCanvas, gameType, 'excluded');
             results.excludedStats = excludedResults.map(stat => ({
@@ -262,12 +314,14 @@ export class LightweightHybridOCR {
 
         // エリア3: 含めるステータス（計算対象エリア）
         try {
-            const includedCanvas = this.extractRegion(imageCanvas, {
+            let includedCanvas = this.extractRegion(imageCanvas, {
                 x: areas.included_stats_area[0],
                 y: areas.included_stats_area[1],
                 width: areas.included_stats_area[2],
                 height: areas.included_stats_area[3]
             });
+
+            includedCanvas = this.cvPreprocess(includedCanvas, 'sub');
 
             const includedResults = await this.recognizeStatArea(includedCanvas, gameType, 'included');
             results.includedStats = includedResults.map(stat => ({
