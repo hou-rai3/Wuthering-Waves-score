@@ -184,8 +184,35 @@ function waitForOpenCV() {
  */
 async function initTesseract() {
     try {
+        // スクリプトの動的ロード（ローカル→CDNフォールバック）
+        const loadScript = (url, attrs = {}) => new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = url;
+            Object.entries(attrs).forEach(([k,v]) => s.setAttribute(k, v));
+            s.onload = () => resolve(true);
+            s.onerror = (e) => reject(new Error(`Failed to load: ${url}`));
+            document.head.appendChild(s);
+        });
+
         if (typeof Tesseract === 'undefined') {
-            showError('Tesseract.js が読み込まれていません（CDNスクリプトを確認してください）');
+            // 絶対URLを作成
+            const baseHref = new URL('.', window.location.href).href;
+            const localTess = new URL('assets/tesseract/tesseract.min.js', baseHref).href;
+            // まずローカルをHEAD確認しつつ試行
+            try {
+                const head = await fetch(localTess, { method: 'HEAD' });
+                if (head.ok) {
+                    await loadScript(localTess);
+                } else {
+                    throw new Error('Local tesseract.min.js not accessible');
+                }
+            } catch {
+                // CDNフォールバック
+                await loadScript('https://unpkg.com/tesseract.js@5.1.0/dist/tesseract.min.js', { crossorigin: 'anonymous' });
+            }
+        }
+        if (typeof Tesseract === 'undefined') {
+            showError('Tesseract.js が読み込まれていません（スクリプトの取得に失敗）');
             renderEngineOverlay();
             return;
         }
