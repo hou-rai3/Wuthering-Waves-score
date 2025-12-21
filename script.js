@@ -197,9 +197,11 @@ async function initTesseract() {
             },
             // 明示的にパスを指定（CDN依存の相対解決に左右されないように）
             workerPath: 'https://unpkg.com/tesseract.js@v5.1.0/dist/worker.min.js',
-            corePath: 'https://unpkg.com/tesseract.js-core@5.0.0/dist/tesseract-core.wasm.js',
+            corePath: 'https://unpkg.com/tesseract.js-core@5.0.0/tesseract-core.wasm',
             langPath: 'https://tessdata.projectnaptha.com/4.0.0'
         });
+        // コアのロード（必須）
+        await worker.load();
         await worker.loadLanguage('jpn');
         await worker.initialize('jpn');
         window.tesseractWorker = worker;
