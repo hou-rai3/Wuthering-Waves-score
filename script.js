@@ -134,6 +134,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Tesseract.jsの初期化
     initTesseract();
     
+    // 初期化の視覚化（両エンジンが未準備ならオーバーレイ開始）
+    if (!enginesReady()) {
+        startEngineOverlayWait(45000);
+    }
+    
     // イベントリスナー設定
     setupEventListeners();
 });
@@ -185,7 +190,16 @@ async function initTesseract() {
             return;
         }
         const { createWorker } = Tesseract;
-        const worker = await createWorker({ logger: (m) => console.log(m) });
+        const worker = await createWorker({
+            logger: (m) => {
+                console.log(m);
+                setOverlayProgress(m);
+            },
+            // 明示的にパスを指定（CDN依存の相対解決に左右されないように）
+            workerPath: 'https://unpkg.com/tesseract.js@v5.1.0/dist/worker.min.js',
+            corePath: 'https://unpkg.com/tesseract.js-core@5.0.0/dist/tesseract-core.wasm.js',
+            langPath: 'https://tessdata.projectnaptha.com/4.0.0'
+        });
         await worker.loadLanguage('jpn');
         await worker.initialize('jpn');
         window.tesseractWorker = worker;
@@ -273,6 +287,18 @@ function renderEngineOverlay() {
     if (cvSpan) cvSpan.textContent = openCVReady ? '準備完了 ✓' : '初期化中…';
     if (ocrSpan) ocrSpan.textContent = tesseractReady ? '準備完了 ✓' : '初期化中…';
     if (title) title.textContent = enginesReady() ? 'エンジン準備完了' : 'エンジン初期化中…';
+}
+
+function setOverlayProgress(m) {
+    const el = document.getElementById('engineOverlay');
+    if (!el) return;
+    const ocrSpan = el.querySelector('#ocrStatus span');
+    const title = el.querySelector('#engineTitle');
+    if (m?.status) {
+        const pct = typeof m.progress === 'number' ? ` ${Math.round(m.progress * 100)}%` : '';
+        if (ocrSpan) ocrSpan.textContent = `${m.status}${pct}`;
+        if (title && !enginesReady()) title.textContent = 'エンジン初期化中…';
+    }
 }
 
 function startEngineOverlayWait(timeoutMs) {
