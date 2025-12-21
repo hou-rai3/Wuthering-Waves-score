@@ -190,24 +190,46 @@ async function initTesseract() {
             return;
         }
         const { createWorker } = Tesseract;
-        const worker = await createWorker({
-            logger: (m) => {
-                console.log(m);
-                setOverlayProgress(m);
+        const configs = [
+            // 優先: ローカルアセット（GitHub Pagesで自ホスト）
+            {
+                workerPath: './assets/tesseract/worker.min.js',
+                corePath: './assets/tesseract/tesseract-core.wasm',
+                langPath: './assets/tesseract'
             },
-            // 明示的にパスを指定（CDN依存の相対解決に左右されないように）
-            workerPath: 'https://unpkg.com/tesseract.js@v5.1.0/dist/worker.min.js',
-            corePath: 'https://unpkg.com/tesseract.js-core@5.0.0/tesseract-core.wasm',
-            langPath: 'https://tessdata.projectnaptha.com/4.0.0'
-        });
-        // コアのロード（必須）
-        await worker.load();
-        await worker.loadLanguage('jpn');
-        await worker.initialize('jpn');
-        window.tesseractWorker = worker;
-        console.log('Tesseract.js 初期化完了');
-        tesseractReady = true;
-        renderEngineOverlay();
+            // フォールバック: CDN
+            {
+                workerPath: 'https://unpkg.com/tesseract.js@v5.1.0/dist/worker.min.js',
+                corePath: 'https://unpkg.com/tesseract.js-core@5.0.0/tesseract-core.wasm',
+                langPath: 'https://tessdata.projectnaptha.com/4.0.0'
+            }
+        ];
+
+        let lastError = null;
+        for (const cfg of configs) {
+            try {
+                const worker = await createWorker({
+                    ...cfg,
+                    logger: (m) => {
+                        console.log(m);
+                        setOverlayProgress(m);
+                    }
+                });
+                await worker.load();
+                await worker.loadLanguage('jpn');
+                await worker.initialize('jpn');
+                window.tesseractWorker = worker;
+                console.log('Tesseract.js 初期化完了');
+                tesseractReady = true;
+                renderEngineOverlay();
+                return;
+            } catch (err) {
+                console.warn('Tesseract初期化失敗（試行）:', cfg, err);
+                lastError = err;
+                try { await window.tesseractWorker?.terminate(); } catch {}
+            }
+        }
+        throw lastError || new Error('Tesseract初期化に失敗しました');
     } catch (error) {
         console.error('Tesseract.js 初期化失敗:', error);
         showError('OCRエンジンの初期化に失敗しました');
