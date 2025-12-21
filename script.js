@@ -212,6 +212,21 @@ async function initTesseract() {
         ];
 
         let lastError = null;
+        // createWorker APIバージョン差異に対応するラッパー
+        const createWorkerCompat = async (cfg) => {
+            // まず options単独を試す（v5系）
+            try {
+                return await createWorker({ ...cfg });
+            } catch (e1) {
+                // 旧API: 第1引数に言語、第2引数にoptions（.mapエラーに対応）
+                try {
+                    return await createWorker('jpn', { ...cfg });
+                } catch (e2) {
+                    // 元の例外を優先して返す
+                    throw e1;
+                }
+            }
+        };
         for (const cfg of configs) {
             try {
                 // ローカルアセットの事前確認（HEAD）
@@ -223,9 +238,7 @@ async function initTesseract() {
                         throw new Error('Local assets not accessible');
                     }
                 }
-                const worker = await createWorker({
-                    ...cfg
-                });
+                const worker = await createWorkerCompat(cfg);
                 await worker.load();
                 await worker.loadLanguage('jpn');
                 await worker.initialize('jpn');
