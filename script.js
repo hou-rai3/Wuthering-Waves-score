@@ -115,7 +115,9 @@ class HistoryManager {
 }
 
 // インスタンス生成（クラス定義後）
-// 上でクラス定義済み。ここでの重複インスタンス生成は不要。
+// settingsManager / historyManager をグローバルに用意
+const settingsManager = new SettingsManager();
+const historyManager = new HistoryManager();
 
 // ============================================
 // 初期化
@@ -187,6 +189,10 @@ function setupEventListeners() {
     document.addEventListener('paste', handlePaste);
     // ドロップゾーン取得（ペースト/ドラッグ&ドロップ共通）
     const dropzone = document.getElementById('dropzone');
+    if (!dropzone) {
+        showError('UI要素 dropzone が見つかりません（HTMLを確認してください）');
+        return;
+    }
     // ドロップゾーンにフォーカスしている場合のペーストも拾う
     dropzone.addEventListener('paste', handlePaste);
     
@@ -362,16 +368,28 @@ async function readClipboardImage() {
 function initializeSettings() {
     ['cropX', 'cropY', 'cropW', 'cropH'].forEach(id => {
         const slider = document.getElementById(id);
+        if (!slider) {
+            console.warn(`設定スライダー要素が見つかりません: ${id}`);
+            return;
+        }
         const value = settingsManager.get(id);
         slider.value = value;
-        document.getElementById(id + 'Value').textContent = value;
+        const labelEl = document.getElementById(id + 'Value');
+        if (labelEl) labelEl.textContent = value;
+        else console.warn(`設定値ラベルが見つかりません: ${id}Value`);
     });
 
     ['weightAttack', 'weightCriRate', 'weightCriDmg'].forEach(id => {
         const slider = document.getElementById(id);
+        if (!slider) {
+            console.warn(`重みスライダー要素が見つかりません: ${id}`);
+            return;
+        }
         const value = settingsManager.get(id);
         slider.value = value;
-        document.getElementById(id + 'Value').textContent = value.toFixed(1);
+        const labelEl = document.getElementById(id + 'Value');
+        if (labelEl) labelEl.textContent = value.toFixed(1);
+        else console.warn(`重みラベルが見つかりません: ${id}Value`);
     });
 }
     // メッセージを消す
@@ -448,6 +466,7 @@ function clearHistory() {
  */
 async function processImage(img) {
     try {
+        console.time('processImage');
         // 元の画像をCanvasに描画
         const originalCanvas = document.getElementById('originalCanvas');
         originalCanvas.width = img.width;
@@ -478,6 +497,7 @@ async function processImage(img) {
     } finally {
         showLoading(false);
         document.getElementById('preview-section').style.display = 'block';
+        console.timeEnd('processImage');
     }
 }
 
@@ -546,6 +566,7 @@ async function processStatusArea(img, scale) {
         return { cropX, cropY, cropW, cropH };
     } catch (error) {
         console.error('ステータス領域処理エラー:', error);
+        showError('ステータス領域の処理に失敗しました: ' + (error?.message || error));
         return null;
     }
 }
@@ -752,6 +773,7 @@ function showError(message) {
     const errorDiv = document.getElementById('errorMessage');
     errorDiv.textContent = message;
     errorDiv.style.display = 'block';
+    console.error('[UI Error]', message);
 }
 
 /**
@@ -839,4 +861,19 @@ window.addEventListener('beforeunload', () => {
     if (window.tesseractWorker) {
         window.tesseractWorker.terminate();
     }
+});
+
+// ============================================
+// グローバルエラーハンドラ（原因の特定を支援）
+// ============================================
+window.addEventListener('error', (event) => {
+    const msg = `予期せぬエラー: ${event.message} (${event.filename}:${event.lineno})`;
+    console.error('GlobalError:', event.error || event.message);
+    showMessage(msg, 'error');
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+    const reason = event.reason?.message || String(event.reason);
+    console.error('UnhandledRejection:', event.reason);
+    showMessage(`予期せぬ非同期エラー: ${reason}`, 'error');
 });
