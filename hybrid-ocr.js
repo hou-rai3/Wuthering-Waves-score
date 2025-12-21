@@ -8,6 +8,7 @@ export class LightweightHybridOCR {
         this.templateCache = new Map();
         this.statTemplates = new Map();
         this.isOpenCVReady = false;
+        this.gameConfigs = null;
         this.initializeSystem();
     }
 
@@ -18,56 +19,125 @@ export class LightweightHybridOCR {
         // ゲーム別のステータステンプレートを準備
         this.loadStatTemplates();
         
+        // ゲーム設定の読み込み
+        this.loadGameConfigs();
+        
         console.log('Lightweight Hybrid OCR System initialized');
     }
 
+    loadGameConfigs() {
+        // ゲーム設定をローカルで保持
+        this.gameConfigs = {
+            '鳴潮': {
+                three_area_recognition: {
+                    item_name_area: [720, 70, 190, 20],
+                    excluded_stats_area: [720, 140, 205, 20],
+                    included_stats_area: [720, 120, 205, 123]
+                },
+                ocr_settings: {
+                    threshold: 160,
+                    tesseract_config: {
+                        psm: 6,
+                        tessedit_char_whitelist:
+                            "あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンー・攻撃力防御力HP会心率会心ダメージ効率"
+                    }
+                },
+                stat_map: {
+                    "攻撃力": "攻撃力",
+                    "ATK": "攻撃力",
+                    "防御力": "防御力",
+                    "DEF": "防御力",
+                    "HP": "HP",
+                    "ライフ": "HP",
+                    "会心率": "会心率",
+                    "クリ率": "会心率",
+                    "会心ダメージ": "会心ダメージ",
+                    "クリダメ": "会心ダメージ",
+                    "効率": "効率"
+                }
+            }
+        };
+    }
+
     /**
-     * OpenCVベースの前処理: グレースケール → CLAHE → ブラー → 適応的2値化 → 反転
-     * type: 'name' | 'main' | 'sub' でパラメータを少し調整
+     * OpenCVベースの前処理: グレースケール → CLAHE → ノイズ除去 → 適応的2値化 → モルフォロジー
+     * type: 'name' | 'main' | 'sub' でパラメータを最適化
      */
     cvPreprocess(canvas, type = 'sub') {
-        if (!this.isOpenCVReady) return canvas;
+        if (!this.isOpenCVReady || !canvas) return canvas;
 
-        const src = cv.imread(canvas);
-        const gray = new cv.Mat();
-        cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+        try {
+            const src = cv.imread(canvas);
+            
+            // グレースケール化
+            const gray = new cv.Mat();
+            cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
 
-        const clahe = new cv.CLAHE(2.0, new cv.Size(8, 8));
-        const claheOut = new cv.Mat();
-        clahe.apply(gray, claheOut);
-        clahe.delete();
+            // CLAHE（コントラスト限定適応的ヒストグラム平坦化）
+            const claheIntensity = type === 'name' ? 3.0 : type === 'main' ? 2.5 : 2.0;
+            const clahe = new cv.CLAHE(claheIntensity, new cv.Size(8, 8));
+            const claheOut = new cv.Mat();
+            clahe.apply(gray, claheOut);
+            clahe.delete();
 
-        const blurred = new cv.Mat();
-        cv.GaussianBlur(claheOut, blurred, new cv.Size(3, 3), 0, 0, cv.BORDER_DEFAULT);
+            // ノイズ除去（バイラテラルフィルタまたはモルフォロジー）
+            const denoised = new cv.Mat();
+            const kernelSize = type === 'name' ? 3 : 5;
+            cv.morphologyEx(
+                claheOut, 
+                denoised, 
+                cv.MORPH_OPEN, 
+                cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(kernelSize, kernelSize))
+            );
 
-        const binary = new cv.Mat();
-        const blockSize = type === 'name' ? 15 : type === 'main' ? 21 : 25;
-        const C = type === 'name' ? 8 : type === 'main' ? 10 : 12;
-        cv.adaptiveThreshold(
-            blurred,
-            binary,
-            255,
-            cv.ADAPTIVE_THRESH_GAUSSIAN_C,
-            cv.THRESH_BINARY_INV,
-            blockSize,
-            C
-        );
+            // ガウシアンブラー
+            const blurred = new cv.Mat();
+            const blurSize = type === 'name' ? 3 : type === 'main' ? 3 : 5;
+            cv.GaussianBlur(denoised, blurred, new cv.Size(blurSize, blurSize), 0, 0, cv.BORDER_DEFAULT);
 
-        // 文字を黒、背景を白に揃える
-        const inverted = new cv.Mat();
-        cv.bitwise_not(binary, inverted);
+            // 適応的2値化（ゲーム独特の金色テキスト対応）
+            const binary = new cv.Mat();
+            const blockSize = type === 'name' ? 15 : type === 'main' ? 19 : 25;
+            const C = type === 'name' ? 5 : type === 'main' ? 8 : 10;
+            cv.adaptiveThreshold(
+                blurred,
+                binary,
+                255,
+                cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+                cv.THRESH_BINARY_INV,
+                blockSize,
+                C
+            );
 
-        const dstCanvas = document.createElement('canvas');
-        cv.imshow(dstCanvas, inverted);
+            // モルフォロジー処理：クロージング（小さな穴を埋める）
+            const morphKernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(3, 3));
+            const morphed = new cv.Mat();
+            cv.morphologyEx(binary, morphed, cv.MORPH_CLOSE, morphKernel);
+            morphKernel.delete();
 
-        src.delete();
-        gray.delete();
-        claheOut.delete();
-        blurred.delete();
-        binary.delete();
-        inverted.delete();
+            // 文字を黒、背景を白に正規化
+            const inverted = new cv.Mat();
+            cv.bitwise_not(morphed, inverted);
 
-        return dstCanvas;
+            // Canvas への出力
+            const dstCanvas = document.createElement('canvas');
+            cv.imshow(dstCanvas, inverted);
+
+            // メモリ解放
+            src.delete();
+            gray.delete();
+            claheOut.delete();
+            denoised.delete();
+            blurred.delete();
+            binary.delete();
+            morphed.delete();
+            inverted.delete();
+
+            return dstCanvas;
+        } catch (error) {
+            console.error('cvPreprocess エラー:', error);
+            return canvas;
+        }
     }
 
     async loadOpenCV() {
@@ -129,6 +199,101 @@ export class LightweightHybridOCR {
         for (const [game, templates] of Object.entries(gameTemplates)) {
             this.statTemplates.set(game, templates);
         }
+
+        // フィルター関数マップの初期化
+        this.filters = new Map([
+            ['denoise', (canvas) => this.denoiseFilter(canvas)],
+            ['adaptiveBinary', (canvas) => this.adaptiveBinaryFilter(canvas)],
+            ['backgroundRemoval', (canvas) => this.backgroundRemovalFilter(canvas)],
+            ['sharpen', (canvas) => this.sharpenFilter(canvas)],
+            ['edgeEnhance', (canvas) => this.edgeEnhanceFilter(canvas)]
+        ]);
+    }
+
+    // ===================================================================
+    // フィルター実装
+    // ===================================================================
+
+    denoiseFilter(canvas) {
+        if (!this.isOpenCVReady) return canvas;
+        
+        try {
+            const src = cv.imread(canvas);
+            const dst = new cv.Mat();
+            cv.fastNlMeansDenoising(src, dst);
+            
+            const resultCanvas = document.createElement('canvas');
+            cv.imshow(resultCanvas, dst);
+            
+            src.delete();
+            dst.delete();
+            
+            return resultCanvas;
+        } catch (error) {
+            console.warn('denoiseFilter エラー:', error);
+            return canvas;
+        }
+    }
+
+    sharpenFilter(canvas) {
+        const ctx = canvas.getContext('2d');
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        const width = canvas.width;
+        const height = canvas.height;
+
+        // シャープニングカーネル
+        const kernel = [
+            0, -1,  0,
+            -1,  5, -1,
+            0, -1,  0
+        ];
+
+        for (let y = 1; y < height - 1; y++) {
+            for (let x = 1; x < width - 1; x++) {
+                for (let c = 0; c < 3; c++) {
+                    let sum = 0;
+                    let idx = 0;
+                    
+                    for (let dy = -1; dy <= 1; dy++) {
+                        for (let dx = -1; dx <= 1; dx++) {
+                            const pixelIdx = ((y + dy) * width + (x + dx)) * 4 + c;
+                            sum += data[pixelIdx] * kernel[idx++];
+                        }
+                    }
+                    
+                    const pixelIdx = (y * width + x) * 4 + c;
+                    data[pixelIdx] = Math.max(0, Math.min(255, sum));
+                }
+            }
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+        return canvas;
+    }
+
+    backgroundRemovalFilter(canvas) {
+        const ctx = canvas.getContext('2d');
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+
+        // 明度に基づいて背景を除去
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+            const brightness = (r + g + b) / 3;
+
+            if (brightness > 100 && brightness < 200) {
+                // グレーゾーン（背景）を黒に
+                data[i] = 0;
+                data[i + 1] = 0;
+                data[i + 2] = 0;
+            }
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+        return canvas;
     }
 
     /**
@@ -252,13 +417,17 @@ export class LightweightHybridOCR {
      * 3エリア認識システム - 計算式の改善
      * エリア1: 音骸名前 / エリア2: 含めないステータス / エリア3: 含めるステータス
      */
-    async recognizeThreeAreas(imageCanvas, gameType, areaOverride = null) {
-        const gameConfig = this.gameConfigs[gameType];
-        if (!gameConfig.three_area_recognition && !areaOverride) {
+    async recognizeThreeAreas(imageCanvas, gameType, areaOverride = null, options = {}) {
+        const gameConfig = this.gameConfigs?.[gameType];
+        
+        if (!gameConfig?.three_area_recognition && !areaOverride) {
             throw new Error(`3エリア認識設定が見つかりません: ${gameType}`);
         }
 
-        const areas = areaOverride || gameConfig.three_area_recognition;
+        const baseAreas = areaOverride || gameConfig.three_area_recognition;
+        const shouldScale = options.alreadyScaled ? false : options.autoScale !== false;
+        const areas = this.scaleAreasForImage(baseAreas, gameConfig, imageCanvas, shouldScale);
+        
         const results = {
             itemName: { text: '', confidence: 0, area: 'item_name' },
             excludedStats: [], // 計算から除外するステータス
@@ -272,6 +441,8 @@ export class LightweightHybridOCR {
         };
 
         console.log('🎯 3エリア認識を開始:', gameType);
+        console.log('  画像サイズ:', results.debug.imageSize);
+        console.log('  認識エリア:', areas);
 
         // エリア1: 音骸名前の認識
         try {
@@ -290,9 +461,9 @@ export class LightweightHybridOCR {
                 area: 'item_name'
             };
             
-            console.log('📝 音骸名前認識結果:', results.itemName);
+            console.log('📝 音骸名前認識:', results.itemName);
         } catch (error) {
-            console.warn('音骸名前認識エラー:', error);
+            console.warn('⚠️  音骸名前認識エラー:', error.message);
         }
 
         // エリア2: 含めないステータス（除外エリア）
@@ -313,9 +484,9 @@ export class LightweightHybridOCR {
                 includeInCalculation: false  // 計算から除外
             }));
             
-            console.log('🚫 除外ステータス:', results.excludedStats.length, '個');
+            console.log(`🚫 除外ステータス: ${results.excludedStats.length}個 -`, results.excludedStats.map(s => s.name));
         } catch (error) {
-            console.warn('除外ステータス認識エラー:', error);
+            console.warn('⚠️  除外ステータス認識エラー:', error.message);
         }
 
         // エリア3: 含めるステータス（計算対象エリア）
@@ -336,10 +507,16 @@ export class LightweightHybridOCR {
                 includeInCalculation: true  // 計算に含める
             }));
             
-            console.log('✅ 含めるステータス:', results.includedStats.length, '個');
+            console.log(`✅ 含めるステータス: ${results.includedStats.length}個 -`, results.includedStats.map(s => s.name));
         } catch (error) {
-            console.warn('含めるステータス認識エラー:', error);
+            console.warn('⚠️  含めるステータス認識エラー:', error.message);
         }
+
+        console.log('✨ 3エリア認識完了 -', {
+            itemName: results.itemName.text,
+            excluded: results.excludedStats.length,
+            included: results.includedStats.length
+        });
 
         return results;
     }
@@ -348,36 +525,47 @@ export class LightweightHybridOCR {
      * 音骸名前の認識（エリア1専用）
      */
     async recognizeItemName(canvas, gameType) {
-        // 音骸名前に特化した前処理
-        let processedCanvas = this.cloneCanvas(canvas);
-        
-        // 1. 3倍スケールアップ
-        processedCanvas = this.scaleCanvas(processedCanvas, 3.0);
-        
-        // 2. ゲーム固有の名前色抽出
-        processedCanvas = await this.extractItemNameColor(processedCanvas, gameType);
-        
-        // 3. 文字強調処理
-        processedCanvas = this.enhanceTextForName(processedCanvas);
-
-        // 音骸名前用のOCR設定
-        const ocrConfig = {
-            psm: 8, // 単語レベル
-            tessedit_char_whitelist: 'あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンー・'
-        };
+        if (!canvas) return { text: '', confidence: 0 };
 
         try {
+            // 音骸名前に特化した前処理
+            let processedCanvas = this.cloneCanvas(canvas);
+            
+            // 1. 3倍スケールアップ（テキストサイズ向上）
+            processedCanvas = this.scaleCanvas(processedCanvas, 3.0);
+            
+            // 2. ゲーム固有の名前色抽出（金色テキスト対応）
+            if (this.isOpenCVReady) {
+                processedCanvas = await this.extractItemNameColor(processedCanvas, gameType);
+            }
+            
+            // 3. 文字強調処理
+            processedCanvas = this.enhanceTextForName(processedCanvas);
+
+            // 音骸名前用のOCR設定（高精度）
+            const ocrConfig = {
+                psm: 8, // 単語レベル
+                tessedit_char_whitelist: 'あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンー・'
+            };
+
             const { data: { text, confidence } } = await Tesseract.recognize(
                 processedCanvas,
                 'jpn',
                 { 
-                    logger: m => console.log('🔤', m.status, m.progress),
+                    logger: m => {
+                        if (m.status === 'recognizing') {
+                            console.log('🔤 音骸名前認識中:', (m.progress * 100).toFixed(0) + '%');
+                        }
+                    },
                     ...ocrConfig 
                 }
             );
 
+            const cleanedText = text.trim().split('\n')[0]; // 複数行の場合は最初の行のみ
+            console.log(`✓ 音骸名前認識: "${cleanedText}" (信頼度: ${Math.round(confidence)}%)`);
+
             return {
-                text: text.trim(),
+                text: cleanedText,
                 confidence: confidence / 100
             };
         } catch (error) {
@@ -392,42 +580,49 @@ export class LightweightHybridOCR {
     async recognizeStatArea(canvas, gameType, areaType, debugInfo = null) {
         const stats = [];
         
-        // ステータス行を検出
-        const statLines = await this.detectStatLines(canvas);
-        console.log(`📊 ${areaType}エリアで${statLines.length}行のステータスを検出`);
+        if (!canvas) return stats;
 
-        if (debugInfo) {
-            debugInfo.lines = statLines.map(l => ({ ...l }));
-            debugInfo.canvas = { width: canvas.width, height: canvas.height };
-            debugInfo.recognized = [];
-        }
+        try {
+            // ステータス行を検出（OpenCV + 行検出）
+            const statLines = await this.detectStatLines(canvas);
+            console.log(`📊 ${areaType}エリアで${statLines.length}行のステータスを検出`);
 
-        for (let i = 0; i < statLines.length; i++) {
-            const line = statLines[i];
-            
-            try {
-                // 各行からステータス名と値を抽出
-                const statResult = await this.recognizeStatLine(canvas, line, gameType);
-                
-                if (statResult && statResult.name && statResult.value) {
-                    const statObj = {
-                        name: statResult.name,
-                        value: statResult.value,
-                        confidence: statResult.confidence,
-                        lineIndex: i,
-                        area: areaType,
-                        rawText: statResult.rawText
-                    };
-                    stats.push(statObj);
-                    if (debugInfo) {
-                        debugInfo.recognized.push({ ...statObj });
-                    }
-                    
-                    console.log(`📈 ${areaType}[${i}]:`, statResult.name, '=', statResult.value);
-                }
-            } catch (error) {
-                console.warn(`ステータス行${i}の認識エラー:`, error);
+            if (debugInfo) {
+                debugInfo.lines = statLines.map(l => ({ ...l }));
+                debugInfo.canvas = { width: canvas.width, height: canvas.height };
+                debugInfo.recognized = [];
             }
+
+            // 各行からステータスを抽出
+            for (let i = 0; i < statLines.length; i++) {
+                const line = statLines[i];
+                
+                try {
+                    const statResult = await this.recognizeStatLine(canvas, line, gameType);
+                    
+                    if (statResult && statResult.name && statResult.value) {
+                        const statObj = {
+                            name: statResult.name,
+                            value: statResult.value,
+                            confidence: statResult.confidence,
+                            lineIndex: i,
+                            area: areaType,
+                            rawText: statResult.rawText || ''
+                        };
+                        stats.push(statObj);
+                        
+                        if (debugInfo) {
+                            debugInfo.recognized.push({ ...statObj });
+                        }
+                        
+                        console.log(`📈 ${areaType}[${i}]: ${statResult.name} = ${statResult.value} (信頼度: ${Math.round(statResult.confidence * 100)}%)`);
+                    }
+                } catch (error) {
+                    console.warn(`ステータス行${i}の認識エラー:`, error.message);
+                }
+            }
+        } catch (error) {
+            console.error(`${areaType}エリア認識エラー:`, error);
         }
 
         return stats;
@@ -616,8 +811,23 @@ export class LightweightHybridOCR {
     }
 
     // ===================================================================
-    // 数値認識用ユーティリティ関数
+    // ゲーム固有前処理ユーティリティ
     // ===================================================================
+
+    createColorMask(canvas, colorRange) {
+        // 色範囲でマスク作成（未実装 - フォールバック）
+        return canvas;
+    }
+
+    optimizeForFontSize(canvas, fontSize) {
+        // フォントサイズに応じた最適化（未実装 - フォールバック）
+        return canvas;
+    }
+
+    processBackgroundPattern(canvas, pattern) {
+        // 背景パターン処理（未実装 - フォールバック）
+        return canvas;
+    }
 
     extractRegion(canvas, rect) {
         const regionCanvas = document.createElement('canvas');
@@ -660,6 +870,32 @@ export class LightweightHybridOCR {
             .replace(/[^0-9.,%+]/g, '') // 数値関連文字以外を除去
             .replace(/([0-9])([0-9])\.([0-9])/, '$1.$2$3') // 小数点位置修正
             .trim();
+    }
+
+    scaleAreasForImage(baseAreas, gameConfig, imageCanvas, shouldScale = true) {
+        if (!baseAreas) return null;
+        if (!shouldScale) return JSON.parse(JSON.stringify(baseAreas));
+
+        const baseRes = gameConfig?.base_resolution || {
+            width: imageCanvas?.width || 1,
+            height: imageCanvas?.height || 1
+        };
+        const imgW = imageCanvas?.width || baseRes.width;
+        const imgH = imageCanvas?.height || baseRes.height;
+        const scaleX = imgW / baseRes.width;
+        const scaleY = imgH / baseRes.height;
+        const scaleRect = (rect) => [
+            Math.round(rect[0] * scaleX),
+            Math.round(rect[1] * scaleY),
+            Math.round(rect[2] * scaleX),
+            Math.round(rect[3] * scaleY)
+        ];
+
+        return {
+            item_name_area: scaleRect(baseAreas.item_name_area),
+            excluded_stats_area: scaleRect(baseAreas.excluded_stats_area),
+            included_stats_area: scaleRect(baseAreas.included_stats_area)
+        };
     }
 
     scaleCanvas(canvas, scale) {
@@ -1127,31 +1363,49 @@ export class LightweightHybridOCR {
      * ステータス名の認識
      */
     async recognizeStatName(canvas, gameType) {
-        let processedCanvas = this.cloneCanvas(canvas);
-        
-        // ステータス名用の前処理
-        processedCanvas = this.scaleCanvas(processedCanvas, 2.5);
-        processedCanvas = await this.extractStatNameColor(processedCanvas, gameType);
-        
-        const gameConfig = this.gameConfigs[gameType];
-        const ocrConfig = {
-            psm: 8,
-            tessedit_char_whitelist: gameConfig.ocr_settings.tesseract_config.tessedit_char_whitelist
-        };
+        if (!canvas) return { text: '', confidence: 0 };
 
         try {
+            let processedCanvas = this.cloneCanvas(canvas);
+            
+            // ステータス名用の前処理
+            processedCanvas = this.scaleCanvas(processedCanvas, 2.5);
+            
+            if (this.isOpenCVReady) {
+                processedCanvas = await this.extractStatNameColor(processedCanvas, gameType);
+            }
+            
+            const gameConfig = this.gameConfigs[gameType];
+            const charWhitelist = gameConfig?.ocr_settings?.tesseract_config?.tessedit_char_whitelist || 
+                "あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンー・";
+            
+            const ocrConfig = {
+                psm: 8,
+                tessedit_char_whitelist: charWhitelist
+            };
+
             const { data: { text, confidence } } = await Tesseract.recognize(
                 processedCanvas,
                 'jpn',
-                ocrConfig
+                { 
+                    logger: m => {
+                        if (m.status === 'recognizing') {
+                            console.log('📛 ステータス名認識中:', (m.progress * 100).toFixed(0) + '%');
+                        }
+                    },
+                    ...ocrConfig 
+                }
             );
 
+            const normalizedText = this.normalizeStatName(text.trim(), gameType);
+            console.log(`✓ ステータス名: "${normalizedText}" (信頼度: ${Math.round(confidence)}%)`);
+
             return {
-                text: this.normalizeStatName(text.trim(), gameType),
+                text: normalizedText,
                 confidence: confidence / 100
             };
         } catch (error) {
-            console.warn('ステータス名OCRエラー:', error);
+            console.warn('ステータス名OCRエラー:', error.message);
             return { text: '', confidence: 0 };
         }
     }
@@ -1160,66 +1414,137 @@ export class LightweightHybridOCR {
      * ステータス値の認識
      */
     async recognizeStatValue(canvas, gameType) {
-        let processedCanvas = this.cloneCanvas(canvas);
-        
-        // 数値用の前処理
-        processedCanvas = await this.numericPreprocessing(processedCanvas, gameType);
-        
-        const ocrConfig = {
-            psm: 7,
-            tessedit_char_whitelist: '0123456789.,%+'
-        };
+        if (!canvas) return { value: '', confidence: 0 };
 
         try {
+            let processedCanvas = this.cloneCanvas(canvas);
+            
+            // 数値用の前処理（より積極的に処理）
+            processedCanvas = this.scaleCanvas(processedCanvas, 2.5);
+            processedCanvas = await this.numericPreprocessing(processedCanvas, gameType);
+            
+            const ocrConfig = {
+                psm: 7, // 単一テキスト行
+                tessedit_char_whitelist: '0123456789.,%+−'
+            };
+
             const { data: { text, confidence } } = await Tesseract.recognize(
                 processedCanvas,
                 'eng',
-                ocrConfig
+                { 
+                    logger: m => {
+                        if (m.status === 'recognizing') {
+                            console.log('🔢 数値認識中:', (m.progress * 100).toFixed(0) + '%');
+                        }
+                    },
+                    ...ocrConfig 
+                }
             );
 
+            const normalizedValue = this.normalizeNumericText(text.trim());
+            console.log(`✓ ステータス値: "${normalizedValue}" (信頼度: ${Math.round(confidence)}%)`);
+
             return {
-                value: this.normalizeNumericText(text.trim()),
+                value: normalizedValue,
                 confidence: confidence / 100
             };
         } catch (error) {
-            console.warn('ステータス値OCRエラー:', error);
+            console.warn('ステータス値OCRエラー:', error.message);
             return { value: '', confidence: 0 };
         }
     }
 
     /**
-     * 音骸名前の色抽出
+     * 音骸名前の色抽出（高精度化）
      */
     async extractItemNameColor(canvas, gameType) {
+        if (!this.isOpenCVReady) {
+            // フォールバック
+            return this.extractItemNameColorCPU(canvas, gameType);
+        }
+
+        try {
+            const src = cv.imread(canvas);
+            const hsv = new cv.Mat();
+            cv.cvtColor(src, hsv, cv.COLOR_RGB2HSV);
+
+            // ゲーム別の色范囲設定
+            const colorRanges = {
+                '鳴潮': {
+                    lower1: new cv.Scalar(35, 100, 100),   // 金色下限
+                    upper1: new cv.Scalar(45, 255, 255),   // 金色上限
+                    lower2: new cv.Scalar(0, 0, 180),      // 白色下限
+                    upper2: new cv.Scalar(180, 30, 255)    // 白色上限
+                }
+            };
+
+            const range = colorRanges[gameType] || colorRanges['鳴潮'];
+            
+            // 金色マスク
+            const mask1 = new cv.Mat();
+            cv.inRange(hsv, range.lower1, range.upper1, mask1);
+
+            // 白色マスク
+            const mask2 = new cv.Mat();
+            cv.inRange(hsv, range.lower2, range.upper2, mask2);
+
+            // マスクを統合
+            const combinedMask = new cv.Mat();
+            cv.bitwise_or(mask1, mask2, combinedMask);
+
+            // オリジナル画像にマスク適用
+            const result = new cv.Mat();
+            cv.bitwise_and(src, src, result, combinedMask);
+
+            // Canvas に出力
+            const dstCanvas = document.createElement('canvas');
+            cv.imshow(dstCanvas, result);
+
+            // メモリ解放
+            src.delete();
+            hsv.delete();
+            mask1.delete();
+            mask2.delete();
+            combinedMask.delete();
+            result.delete();
+
+            return dstCanvas;
+        } catch (error) {
+            console.warn('extractItemNameColor OpenCV エラー:', error);
+            return this.extractItemNameColorCPU(canvas, gameType);
+        }
+    }
+
+    /**
+     * CPU ベースの音骸名前色抽出（フォールバック）
+     */
+    extractItemNameColorCPU(canvas, gameType) {
         const ctx = canvas.getContext('2d');
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = imageData.data;
 
         for (let i = 0; i < data.length; i += 4) {
             const r = data[i];
-            const g = data[i + 1]; 
+            const g = data[i + 1];
             const b = data[i + 2];
             const [h, s, v] = this.rgbToHsv(r, g, b);
 
             let isItemName = false;
             
             if (gameType === '鳴潮') {
-                // 音骸名前は通常、金色または白色
+                // 音骸名前は金色(35-45°)または白色
                 isItemName = (
-                    (h >= 40 && h <= 60 && s > 50 && v > 60) ||  // 金色
-                    (s < 30 && v > 180)                          // 白色
+                    (h >= 35 && h <= 45 && s > 100 && v > 100) ||  // 金色
+                    (s < 30 && v > 180)                             // 白色
                 );
-            } else if (gameType === '原神') {
-                // 聖遺物名は橙色系
-                isItemName = (h >= 20 && h <= 40 && s > 60 && v > 120);
             }
 
             if (isItemName) {
-                data[i] = 255;     // 白に変換
+                data[i] = 255;
                 data[i + 1] = 255;
                 data[i + 2] = 255;
             } else {
-                data[i] = 0;       // 黒に変換
+                data[i] = 0;
                 data[i + 1] = 0;
                 data[i + 2] = 0;
             }
