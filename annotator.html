@@ -62,13 +62,19 @@ canvas {
   gap: 6px;
 }
 
-input, select {
+input, select, textarea {
   padding: 8px;
   background: rgba(255,255,255,0.03);
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 6px;
   color: var(--text);
   font-size: 12px;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 60px;
+  font-family: monospace;
 }
 
 button {
@@ -163,11 +169,20 @@ textarea {
 
   <div class="info">
     画像をアップロード後、ドラッグで矩形を描画します。各ボックスにラベルを付けて保存。
+    <br><strong>💡単語モード:</strong> ラベルに認識したい文字列全体を入力（例: "攻撃力", "30.0%"）
   </div>
 
   <div class="input-group">
-    <label>ラベル名</label>
-    <input type="text" id="labelInput" placeholder="例: 攻撃力, 会心率" />
+    <label>ラベル名（実際に認識する文字列）</label>
+    <textarea id="labelInput" placeholder="例: 攻撃力\n例: 30.0%\n例: クリティカルダメージ"></textarea>
+  </div>
+  
+  <div class="input-group">
+    <label>タイプ</label>
+    <select id="typeInput">
+      <option value="text">テキスト（ステータス名など）</option>
+      <option value="number">数値（パーセント、数字）</option>
+    </select>
   </div>
 
   <button onclick="addBox()">ボックス追加</button>
@@ -263,8 +278,9 @@ canvas.addEventListener("mouseup", (e) => {
   const h = Math.abs(endY - startY);
   
   if (w > 10 && h > 10) {
-    const label = labelInput.value || `box_${boxes.length + 1}`;
-    boxes.push({ x, y, w, h, name: label });
+    const label = labelInput.value.trim() || `box_${boxes.length + 1}`;
+    const type = document.getElementById("typeInput").value;
+    boxes.push({ name: label, type: type, x, y, w, h });
     labelInput.value = "";
     redraw();
     updateList();
@@ -292,12 +308,14 @@ function updateList() {
     boxesList.innerHTML = "(未登録)";
     return;
   }
-  boxesList.innerHTML = boxes.map((b, i) => `
+  boxesList.innerHTML = boxes.map((b, i) => {
+    const typeIcon = b.type === "number" ? "🔢" : "📝";
+    return `
     <div class="box-item">
-      <span class="box-label">${i + 1}. ${b.name}</span>
+      <span class="box-label">${i + 1}. ${typeIcon} ${b.name}</span>
       <button class="box-del" onclick="deleteBox(${i})">×</button>
     </div>
-  `).join("");
+  `}).join("");
   updateJSON();
 }
 

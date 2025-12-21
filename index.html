@@ -25,6 +25,21 @@
     <span class="score-label">Score</span>
     <span class="score-value" id="score">--</span>
   </div>
+  
+  <!-- 認識結果表示 -->
+  <div id="results-panel" style="display:none; margin-top: 20px; padding: 20px; background: rgba(0,255,255,0.05); border: 1px solid rgba(0,255,255,0.3); border-radius: 8px;">
+    <h3 style="color: #00ffff; margin-top: 0;">認識結果</h3>
+    <div id="parsed-data" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;"></div>
+    
+    <h3 style="color: #00ffff; margin-top: 20px;">統計情報</h3>
+    <div id="stats-info" style="font-family: monospace; color: #fff; line-height: 1.8;"></div>
+    
+    <details style="margin-top: 20px;">
+      <summary style="color: #00ffff; cursor: pointer; padding: 10px; background: rgba(0,255,255,0.1); border-radius: 4px;">🔧 デバッグ情報（全93ボックス）</summary>
+      <div id="debug-details" style="margin-top: 10px; max-height: 400px; overflow-y: auto; font-family: monospace; font-size: 12px; color: #aaa;"></div>
+    </details>
+  </div>
+  
   <div class="button-row">
     <button class="btn" id="reset-btn" type="button">リセット</button>
     <button class="btn" id="sample-btn" type="button">サンプル画像でテスト</button>
@@ -33,9 +48,7 @@
 </div>
 <canvas id="hidden" width="1920" height="1080"></canvas>
 
-<script type="module">
-import * as tf from "https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js";
-
+<script>
 const statusEl = document.getElementById("status");
 const scoreEl = document.getElementById("score");
 const hidden = document.getElementById("hidden");
@@ -44,87 +57,24 @@ const resetBtn = document.getElementById("reset-btn");
 const sampleBtn = document.getElementById("sample-btn");
 const dropZone = document.getElementById("dropzone");
 
-const worker = new Worker(URL.createObjectURL(new Blob([`
-  self.onmessage = async (ev) => {
-    const { imageData, boxes, modelUrl, classes, weights } = ev.data;
-    if (!self.tfjs) {
-      self.tfjs = await import(modelUrl);
-    }
-    if (!self.model) {
-      self.model = await self.tfjs.loadGraphModel(weights);
-    }
-    const { data, width, height } = imageData;
-    // simple binarization
-    const bin = (arr) => {
-      const out = new Uint8ClampedArray(arr.length/4);
-      for (let i=0,j=0;i<arr.length;i+=4,++j){
-        const g = (arr[i]+arr[i+1]+arr[i+2]) / 3;
-        out[j] = g > 128 ? 255 : 0;
-      }
-      return out;
-    };
-    const preds = [];
-    const binAll = bin(data);
-    for (const b of boxes){
-      const {x,y,w,h} = b;
-      const crop = new Uint8Array(w*h);
-      for (let row=0; row<h; ++row){
-        for (let col=0; col<w; ++col){
-          const srcIdx = (y+row)*width + (x+col);
-          crop[row*w + col] = binAll[srcIdx];
-        }
-      }
-      // resize to 18x18 nearest
-      const tgt = 18, resized = new Float32Array(tgt*tgt);
-      for (let r=0; r<tgt; ++r){
-        for (let c=0; c<tgt; ++c){
-          const sr = Math.floor(r * h / tgt);
-          const sc = Math.floor(c * w / tgt);
-          resized[r*tgt+c] = crop[sr*w+sc] / 255;
-        }
-      }
-      const input = self.tfjs.tensor(resized, [1, tgt, tgt, 1]);
-      const p = self.model.predict(input);
-      const idx = (await p.argMax(-1).data())[0];
-      preds.push(classes[idx]);
-      self.tfjs.dispose([input, p]);
-    }
-    self.postMessage(preds);
-  };
-`], { type: "application/javascript" })));
-
-const CLASSES = []; // will fetch
-const BOXES_1080P = [
-  {x:1500,y:200,w:24,h:32,name:"digit0"},
-  // fill all needed boxes in status area
-];
-
-let modelPath = "web_model/model.json";
-let model; let warm = false;
+const API_URL = "http://localhost:5000/predict";
+let warm = false;
 
 async function init() {
-  statusEl.textContent = "TensorFlow.js 読み込み...";
-  await tf.setBackend("webgl");
-  await tf.ready();
-  model = await tf.loadGraphModel(modelPath);
-  await model.predict(tf.zeros([1,18,18,1])).data(); // warm-up
-  const res = await fetch("web_model/classes.json");
-  CLASSES.push(...await res.json());
-  warm = true;
-  statusEl.textContent = "準備完了。画像をペーストしてください。";
+  statusEl.textContent = "サーバー接続確認中...";
+  try {
+    const res = await fetch("http://localhost:5000/");
+    if (res.ok) {
+      warm = true;
+      statusEl.textContent = "準備完了。画像をペーストしてください。";
+    } else {
+      statusEl.textContent = "サーバーが起動していません。python server.py を実行してください。";
+    }
+  } catch (e) {
+    statusEl.textContent = "サーバーが起動していません。python server.py を実行してください。";
+  }
 }
 init();
-
-function scaleBoxes(w, h) {
-  const sx = w / 1920, sy = h / 1080;
-  return BOXES_1080P.map(b => ({
-    x: Math.round(b.x * sx),
-    y: Math.round(b.y * sy),
-    w: Math.round(b.w * sx),
-    h: Math.round(b.h * sy),
-    name: b.name
-  }));
-}
 
 document.addEventListener("paste", async (e) => {
   if (!warm) return;
@@ -135,8 +85,7 @@ document.addEventListener("paste", async (e) => {
 });
 
 function computeScore(preds){
-  // Example mapping; replace with your weights
-  const weights = { "会心":2.0, "攻撃":1.0, "％":1.0 };
+  const weights = { "会心":2.0, "攻撃":1.0, "%":1.0 };
   let s = 0;
   for (const p of preds){
     if (weights[p]) s += weights[p];
@@ -144,16 +93,6 @@ function computeScore(preds){
   }
   return s;
 }
-
-// UI helpers
-resetBtn.addEventListener("click", () => {
-  scoreEl.textContent = "--";
-  statusEl.textContent = "リセットしました。画像をペーストしてください。";
-});
-
-sampleBtn.addEventListener("click", () => {
-  statusEl.textContent = "サンプル画像機能は未設定です。クリップボードからペーストしてください。";
-});
 
 function setStatus(message, busy=false) {
   statusEl.textContent = message;
@@ -163,24 +102,85 @@ function setStatus(message, busy=false) {
 async function handleFile(file) {
   if (!file) { setStatus("画像が見つかりませんでした", false); return; }
   setStatus("解析中...", true);
-  const bmp = await createImageBitmap(file);
-  hidden.width = bmp.width; hidden.height = bmp.height;
-  ctx.drawImage(bmp, 0, 0);
-  const imgData = ctx.getImageData(0, 0, bmp.width, bmp.height);
-  worker.onmessage = (ev) => {
-    const preds = ev.data;
-    const score = computeScore(preds);
-    scoreEl.textContent = score.toFixed(2);
-    setStatus("完了", false);
+  
+  const reader = new FileReader();
+  reader.onload = async (ev) => {
+    const imageData = ev.target.result;
+    
+    try {
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: imageData })
+      });
+      
+      if (!response.ok) {
+        throw new Error('サーバーエラー');
+      }
+      
+      const result = await response.json();
+      const score = computeScore(result.predictions);
+      scoreEl.textContent = score.toFixed(2);
+      
+      // 認識結果の詳細表示
+      displayResults(result);
+      
+      setStatus("完了 (" + result.stats.elapsed_ms + "ms)", false);
+    } catch (err) {
+      setStatus("エラー: " + err.message, false);
+    }
   };
-  worker.postMessage({
-    imageData: imgData,
-    boxes: scaleBoxes(bmp.width, bmp.height),
-    modelUrl: "https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js",
-    classes: CLASSES,
-    weights: location.origin + "/web_model/model.json"
-  });
+  reader.readAsDataURL(file);
 }
+
+function displayResults(result) {
+  const resultsPanel = document.getElementById('results-panel');
+  const parsedData = document.getElementById('parsed-data');
+  const statsInfo = document.getElementById('stats-info');
+  const debugDetails = document.getElementById('debug-details');
+  
+  resultsPanel.style.display = 'block';
+  
+  // 単語ベースの結果を表示
+  const items = result.results.map((r, i) => {
+    const isAccurate = r.confidence > 50;
+    const color = isAccurate ? '#0f0' : '#f90';
+    return `<div style="padding: 10px; background: rgba(255,255,255,0.05); border-radius: 4px;">
+      <div style="color: #00ffff; font-size: 12px; margin-bottom: 5px;">${r.label} (${r.type})</div>
+      <div style="color: ${color}; font-size: 16px; font-weight: bold;">${r.predicted || '(未認識)'}</div>
+      <div style="color: #999; font-size: 10px; margin-top: 4px;">信頼度: ${r.confidence}%</div>
+    </div>`;
+  }).join('');
+  
+  parsedData.innerHTML = items;
+  
+  // 統計情報
+  const avgConf = result.stats.avg_confidence;
+  statsInfo.innerHTML = `
+    <div>📊 総ボックス数: ${result.stats.total}</div>
+    <div>📈 平均信頼度: ${avgConf}%</div>
+    <div>⚡ 処理時間: ${result.stats.elapsed_ms}ms</div>
+    <div style="margin-top: 10px; padding: 8px; background: rgba(${avgConf > 70 ? '0,255,0' : avgConf > 50 ? '255,165,0' : '255,0,0'},0.1); border-radius: 4px;">
+      ${avgConf > 70 ? '✅ 精度良好' : avgConf > 50 ? '⚠️ 精度中程度 - 座標調整推奨' : '❌ 精度不良 - 座標再設定が必要'}
+    </div>
+  `;
+  
+  // デバッグ詳細
+  debugDetails.innerHTML = result.results.map((r, i) => {
+    const color = r.confidence > 50 ? '#0f0' : '#f90';
+    return `<div style="padding: 5px; border-bottom: 1px solid rgba(255,255,255,0.1);">
+      [${i}] <strong>${r.label}</strong> → <span style="color: ${color}">${r.predicted}</span> (${r.confidence}%) 
+      <span style="color: #666">| box: x=${r.box.x} y=${r.box.y} w=${r.box.w} h=${r.box.h}</span>
+    </div>`;
+  }).join('');
+}
+
+// リセットボタン
+resetBtn.addEventListener('click', () => {
+  scoreEl.textContent = '--';
+  setStatus('準備完了。画像をペーストしてください。', false);
+  document.getElementById('results-panel').style.display = 'none';
+});
 
 // Drag & Drop support
 ["dragenter","dragover"].forEach(evt => {
