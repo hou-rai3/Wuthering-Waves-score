@@ -214,10 +214,22 @@ async function initTesseract() {
         ];
 
         let lastError = null;
-        // createWorker 互換ラッパー（optionsのみ、languagesは常に配列指定）
+        // createWorker 互換ラッパー：まず言語優先の旧API、失敗時にoptionsのみの新API
         const createWorkerCompat = async (cfg) => {
-            const opts = { ...cfg, languages: Array.isArray(cfg.languages) ? cfg.languages : ['jpn'] };
-            return await createWorker(opts);
+            const languages = Array.isArray(cfg.languages) ? cfg.languages : ['jpn'];
+            const opts = { ...cfg };
+            try {
+                // 旧API: createWorker(languages, options)
+                return await createWorker(languages, opts);
+            } catch (e1) {
+                try {
+                    // 新API: createWorker(options)
+                    return await createWorker(opts);
+                } catch (e2) {
+                    // 両方失敗したら最初の例外を返す
+                    throw e1;
+                }
+            }
         };
         for (const cfg of configs) {
             try {
