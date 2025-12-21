@@ -3,18 +3,30 @@
 <head>
 <meta charset="UTF-8" />
 <title>鳴潮 音骸スコアチェッカー</title>
-<style>
-body { font-family: "Noto Sans JP", system-ui, sans-serif; margin: 20px; }
-#status { margin-top: 12px; color: #0a7; }
-#score { font-size: 24px; margin-top: 12px; }
-</style>
+<link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-<h1>鳴潮 音骸スコアチェッカー</h1>
-<p>ステータス画面をコピーしてペーストしてください (Ctrl+V)。</p>
-<div id="status">モデル読み込み中...</div>
-<div id="score">Score: --</div>
-<canvas id="hidden" width="1920" height="1080" style="display:none;"></canvas>
+<div class="main">
+  <div class="header">
+    <div class="title">鳴潮 音骸スコアチェッカー</div>
+    <div class="badge">ゼロ・ウェイティング</div>
+  </div>
+  <p class="lead">ステータス画面をコピーしてペーストしてください (Ctrl+V)。モデルは起動直後にウォームアップされます。</p>
+  <div class="status-row">
+    <div class="status-text" id="status">モデル読み込み中...</div>
+    <div class="badge" aria-live="polite">リアルタイム解析</div>
+  </div>
+  <div class="score-box">
+    <span class="score-label">Score</span>
+    <span class="score-value" id="score">--</span>
+  </div>
+  <div class="button-row">
+    <button class="btn" id="reset-btn" type="button">リセット</button>
+    <button class="btn" id="sample-btn" type="button">サンプル画像でテスト</button>
+  </div>
+  <div class="hint">ペーストを検知するとバックグラウンドで非同期推論を実行します。UIはブロックされません。</div>
+</div>
+<canvas id="hidden" width="1920" height="1080"></canvas>
 
 <script type="module">
 import * as tf from "https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js";
@@ -23,6 +35,8 @@ const statusEl = document.getElementById("status");
 const scoreEl = document.getElementById("score");
 const hidden = document.getElementById("hidden");
 const ctx = hidden.getContext("2d");
+const resetBtn = document.getElementById("reset-btn");
+const sampleBtn = document.getElementById("sample-btn");
 
 const worker = new Worker(URL.createObjectURL(new Blob([`
   self.onmessage = async (ev) => {
@@ -117,7 +131,7 @@ document.addEventListener("paste", async (e) => {
     const preds = ev.data; // per box labels
     // TODO: map preds to fields and compute score
     const score = computeScore(preds);
-    scoreEl.textContent = "Score: " + score.toFixed(2);
+    scoreEl.textContent = score.toFixed(2);
     statusEl.textContent = "完了";
   };
   worker.postMessage({
@@ -139,6 +153,16 @@ function computeScore(preds){
   }
   return s;
 }
+
+// UI helpers
+resetBtn.addEventListener("click", () => {
+  scoreEl.textContent = "--";
+  statusEl.textContent = "リセットしました。画像をペーストしてください。";
+});
+
+sampleBtn.addEventListener("click", () => {
+  statusEl.textContent = "サンプル画像機能は未設定です。クリップボードからペーストしてください。";
+});
 </script>
 </body>
 </html>
