@@ -140,20 +140,27 @@ document.addEventListener('DOMContentLoaded', () => {
  * OpenCV.jsのロード完了を待機
  */
 function waitForOpenCV() {
+    const attachRuntimeHook = () => {
+        try {
+            if (typeof cv !== 'undefined') {
+                cv['onRuntimeInitialized'] = () => {
+                    console.log('OpenCV.js Runtime Initialized');
+                    openCVReady = true;
+                };
+            }
+        } catch (e) {
+            console.error('OpenCV runtime hook attach failed:', e);
+        }
+    };
     const checkInterval = setInterval(() => {
-        if (typeof cv !== 'undefined' && cv.Mat) {
-            console.log('OpenCV.js ロード完了');
-            openCVReady = true;
+        if (typeof cv !== 'undefined') {
+            attachRuntimeHook();
+        }
+        if (openCVReady) {
+            console.log('OpenCV.js 準備完了');
             clearInterval(checkInterval);
         }
     }, 100);
-    // WebAssemblyの初期化完了イベント
-    if (typeof cv !== 'undefined') {
-        cv['onRuntimeInitialized'] = () => {
-            console.log('OpenCV.js Runtime Initialized');
-            openCVReady = true;
-        };
-    }
     
     // タイムアウト（30秒）
     setTimeout(() => {
@@ -168,6 +175,10 @@ function waitForOpenCV() {
  */
 async function initTesseract() {
     try {
+        if (typeof Tesseract === 'undefined') {
+            showError('Tesseract.js が読み込まれていません（CDNスクリプトを確認してください）');
+            return;
+        }
         const { createWorker } = Tesseract;
         const worker = await createWorker({ logger: (m) => console.log(m) });
         await worker.loadLanguage('jpn');
@@ -179,6 +190,28 @@ async function initTesseract() {
         console.error('Tesseract.js 初期化失敗:', error);
         showError('OCRエンジンの初期化に失敗しました');
     }
+}
+
+/**
+ * 両エンジンの準備完了を待機
+ */
+function enginesReady() {
+    return openCVReady && tesseractReady;
+}
+
+function waitForEnginesReady(timeoutMs = 20000) {
+    return new Promise((resolve, reject) => {
+        const started = Date.now();
+        const timer = setInterval(() => {
+            if (enginesReady()) {
+                clearInterval(timer);
+                resolve(true);
+            } else if (Date.now() - started > timeoutMs) {
+                clearInterval(timer);
+                reject(new Error('エンジン初期化がタイムアウトしました'));
+            }
+        }, 100);
+    });
 }
 
 /**
@@ -316,9 +349,14 @@ async function handlePaste(e) {
  */
 async function handleImageFile(file) {
     try {
-        if (!openCVReady || !tesseractReady) {
-            showError('エンジンの準備ができていません。少しお待ちください...');
-            return;
+        if (!enginesReady()) {
+            showMessage('エンジン初期化中…準備完了次第処理します', 'success');
+            try {
+                await waitForEnginesReady(30000);
+            } catch (e) {
+                showError(e.message || 'エンジン初期化待機に失敗しました');
+                return;
+            }
         }
         showLoading(true);
         hideError();
