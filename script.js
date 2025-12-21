@@ -201,31 +201,23 @@ async function initTesseract() {
             {
                 workerPath: localWorker,
                 corePath: localCore,
-                langPath: localBase
+                langPath: localBase,
+                languages: ['jpn']
             },
             // フォールバック: CDN
             {
                 workerPath: 'https://unpkg.com/tesseract.js@v5.1.0/dist/worker.min.js',
                 corePath: 'https://unpkg.com/tesseract.js-core@5.0.0/tesseract-core.wasm',
-                langPath: 'https://tessdata.projectnaptha.com/4.0.0'
+                langPath: 'https://tessdata.projectnaptha.com/4.0.0',
+                languages: ['jpn']
             }
         ];
 
         let lastError = null;
-        // createWorker APIバージョン差異に対応するラッパー
+        // createWorker 互換ラッパー（optionsのみ、languagesは常に配列指定）
         const createWorkerCompat = async (cfg) => {
-            // まず options単独を試す（v5系）
-            try {
-                return await createWorker({ ...cfg });
-            } catch (e1) {
-                // 旧API: 第1引数に言語、第2引数にoptions（.mapエラーに対応）
-                try {
-                    return await createWorker('jpn', { ...cfg });
-                } catch (e2) {
-                    // 元の例外を優先して返す
-                    throw e1;
-                }
-            }
+            const opts = { ...cfg, languages: Array.isArray(cfg.languages) ? cfg.languages : ['jpn'] };
+            return await createWorker(opts);
         };
         for (const cfg of configs) {
             try {
