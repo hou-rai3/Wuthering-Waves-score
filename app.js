@@ -156,23 +156,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- 初期化処理 ---
     function initialize() {
+        console.log('🔧 initialize() 開始');
+        console.log('  gameSelect:', gameSelect);
+        console.log('  GAME_CONFIGS:', GAME_CONFIGS);
+        
         // パフォーマンス情報を表示するボタンを追加
         createPerformanceButton();
         
         // ゲーム選択肢を生成
-        Object.keys(GAME_CONFIGS).forEach(gameName => {
-            const option = document.createElement('option');
-            option.value = gameName;
-            option.textContent = gameName;
-            gameSelect.appendChild(option);
-        });
-        gameSelect.value = Object.keys(GAME_CONFIGS)[0];
-        onGameChange();
+        try {
+            const gameNames = Object.keys(GAME_CONFIGS);
+            console.log('  ゲーム一覧:', gameNames);
+            
+            gameNames.forEach(gameName => {
+                const option = document.createElement('option');
+                option.value = gameName;
+                option.textContent = gameName;
+                gameSelect.appendChild(option);
+                console.log('  ✓ ゲーム追加:', gameName);
+            });
+            
+            gameSelect.value = gameNames[0];
+            console.log('  ✓ ゲーム選択:', gameNames[0]);
+            
+            onGameChange();
+        } catch (error) {
+            console.error('❌ ゲーム初期化エラー:', error);
+            showNotification('ゲーム設定の読み込みに失敗しました: ' + error.message, 'error');
+        }
+        
         setupDragAndDrop();
 
         // 座標入力の初期値とイベント
         syncAreaInputsFromConfig();
         setupAreaInputHandlers();
+        
+        console.log('✅ initialize() 完了');
     }
 
     function setupAreaInputHandlers() {
@@ -340,10 +359,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- ゲーム変更時の処理 ---
     function onGameChange() {
         const gameName = gameSelect.value;
+        console.log('🎮 onGameChange:', gameName);
+        
         currentConfig = GAME_CONFIGS[gameName];
         
         if (!currentConfig) {
-            console.error('ゲーム設定が見つかりません:', gameName);
+            console.error('❌ ゲーム設定が見つかりません:', gameName);
             showNotification('ゲーム設定の読み込みに失敗しました', 'error');
             return;
         }
@@ -352,6 +373,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const saved = loadAreaFromLocalStorage();
         if (saved && saved.item_name_area) {
             currentConfig.three_area_recognition = saved;
+            console.log('  ✓ ローカル座標を適用');
         }
 
         // ゲーム設定をOCRシステムにも同期
@@ -360,6 +382,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ...hybridOCR.gameConfigs[gameName],
                 ...currentConfig
             };
+            console.log('  ✓ OCR設定同期');
         }
 
         document.title = currentConfig.title || 'ゲーム装備スコア計算機';
@@ -369,11 +392,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         characterSelect.innerHTML = '';
         const charBuilds = currentConfig.character_builds || {};
-        Object.keys(charBuilds).forEach(charName => {
+        const charNames = Object.keys(charBuilds);
+        console.log('  キャラクター一覧:', charNames);
+        
+        charNames.forEach(charName => {
             const option = document.createElement('option');
             option.value = charName;
             option.textContent = charName;
             characterSelect.appendChild(option);
+            console.log('    ✓', charName);
         });
 
         const statKeys = Object.keys(currentConfig.stat_map || {});
@@ -387,6 +414,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 入力欄を最新座標に同期
         syncAreaInputsFromConfig();
+        console.log('✅ onGameChange完了');
     }
 
     // --- 画像処理関連 ---
