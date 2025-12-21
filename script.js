@@ -175,11 +175,15 @@ async function initTesseract() {
 function setupEventListeners() {
     // ペースト イベント
     document.addEventListener('paste', handlePaste);
+    // ドロップゾーン取得（ペースト/ドラッグ&ドロップ共通）
+    const dropzone = document.getElementById('dropzone');
+    // ドロップゾーンにフォーカスしている場合のペーストも拾う
+    dropzone.addEventListener('paste', handlePaste);
     
     // ドラッグ&ドロップ
-    const dropzone = document.getElementById('dropzone');
     dropzone.addEventListener('dragover', (e) => {
         e.preventDefault();
+        e.stopPropagation();
         dropzone.classList.add('active');
     });
     
@@ -189,11 +193,17 @@ function setupEventListeners() {
     
     dropzone.addEventListener('drop', (e) => {
         e.preventDefault();
+        e.stopPropagation();
         dropzone.classList.remove('active');
         
         const files = e.dataTransfer.files;
         if (files.length > 0) {
-            handleImageFile(files[0]);
+            const file = files[0];
+            if (!file.type.startsWith('image/')) {
+                showError('画像ファイルのみ対応しています');
+                return;
+            }
+            handleImageFile(file);
         }
     });
     
@@ -256,6 +266,14 @@ function setupEventListeners() {
     // 初期化：設定値をUIに反映＆履歴ロード
     initializeSettings();
     loadHistory();
+
+    // クリップボード読み取りボタン
+    const pasteBtn = document.getElementById('pasteBtn');
+    if (pasteBtn) {
+        pasteBtn.addEventListener('click', async () => {
+            await readClipboardImage();
+        });
+    }
 }
 
 // ============================================
@@ -299,6 +317,32 @@ async function handleImageFile(file) {
         console.error('画像処理エラー:', error);
         showError('画像の処理に失敗しました: ' + error.message);
         showLoading(false);
+    }
+}
+
+/**
+ * クリップボードから画像を読み取る（secure contextのみ）
+ */
+async function readClipboardImage() {
+    try {
+        if (!navigator.clipboard || !navigator.clipboard.read) {
+            showError('このブラウザはクリップボード画像の読み取りに未対応です');
+            return;
+        }
+        const items = await navigator.clipboard.read();
+        for (const item of items) {
+            for (const type of item.types) {
+                if (type.startsWith('image/')) {
+                    const blob = await item.getType(type);
+                    await handleImageFile(blob);
+                    return;
+                }
+            }
+        }
+        showError('クリップボードに画像が見つかりません');
+    } catch (err) {
+        console.error('クリップボード読み取り失敗', err);
+        showError('クリップボードから画像を取得できませんでした');
     }
 }
 

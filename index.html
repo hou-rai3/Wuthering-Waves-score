@@ -75,11 +75,14 @@
 
             <!-- 画像入力エリア -->
             <section class="input-section">
-                <div id="dropzone" class="dropzone">
+                <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="スクリーンショット貼り付け/ドロップエリア">
                     <div class="dropzone-content">
                         <p class="dropzone-icon">📋</p>
                         <p class="dropzone-text">ここにスクリーンショットを貼り付けてください</p>
                         <p class="dropzone-hint">（Ctrl+Vで貼り付け）</p>
+                        <div class="dropzone-actions">
+                            <button id="pasteBtn" class="btn btn-secondary" title="クリップボードから画像を読み取る">貼り付けボタン</button>
+                        </div>
                     </div>
                 </div>
             </section>
