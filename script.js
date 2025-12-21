@@ -190,12 +190,18 @@ async function initTesseract() {
             return;
         }
         const { createWorker } = Tesseract;
+        // 絶対URLでローカルアセットを参照（ワーカーベースの相対解決不一致を回避）
+        const baseHref = new URL('.', window.location.href).href;
+        const localBase = new URL('assets/tesseract/', baseHref).href;
+        const localWorker = new URL('assets/tesseract/worker.min.js', baseHref).href;
+        const localCore = new URL('assets/tesseract/tesseract-core.wasm', baseHref).href;
+
         const configs = [
             // 優先: ローカルアセット（GitHub Pagesで自ホスト）
             {
-                workerPath: './assets/tesseract/worker.min.js',
-                corePath: './assets/tesseract/tesseract-core.wasm',
-                langPath: './assets/tesseract'
+                workerPath: localWorker,
+                corePath: localCore,
+                langPath: localBase
             },
             // フォールバック: CDN
             {
@@ -208,6 +214,15 @@ async function initTesseract() {
         let lastError = null;
         for (const cfg of configs) {
             try {
+                // ローカルアセットの事前確認（HEAD）
+                if (cfg.langPath === localBase) {
+                    const headCore = await fetch(localCore, { method: 'HEAD' });
+                    const headLang = await fetch(new URL('jpn.traineddata', localBase).href, { method: 'HEAD' });
+                    if (!headCore.ok || !headLang.ok) {
+                        console.warn('ローカルアセットが見つかりません。CDNへフォールバックします。', { core: headCore.status, lang: headLang.status });
+                        throw new Error('Local assets not accessible');
+                    }
+                }
                 const worker = await createWorker({
                     ...cfg,
                     logger: (m) => {
