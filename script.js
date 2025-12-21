@@ -224,11 +224,7 @@ async function initTesseract() {
                     }
                 }
                 const worker = await createWorker({
-                    ...cfg,
-                    logger: (m) => {
-                        console.log(m);
-                        setOverlayProgress(m);
-                    }
+                    ...cfg
                 });
                 await worker.load();
                 await worker.loadLanguage('jpn');
