@@ -11,6 +11,8 @@ let openCVReady = false;
 let tesseractReady = false;
 let currentImage = null;
 let currentResults = null;
+let engineWaitTimerId = null;
+let engineWaitDeadline = 0;
 
 // FHD（1920x1080）を基準とした座標定義
 const REFERENCE_WIDTH = 1920;
@@ -146,6 +148,7 @@ function waitForOpenCV() {
                 cv['onRuntimeInitialized'] = () => {
                     console.log('OpenCV.js Runtime Initialized');
                     openCVReady = true;
+                    renderEngineOverlay();
                 };
             }
         } catch (e) {
@@ -159,6 +162,7 @@ function waitForOpenCV() {
         if (openCVReady) {
             console.log('OpenCV.js 準備完了');
             clearInterval(checkInterval);
+            renderEngineOverlay();
         }
     }, 100);
     
@@ -177,6 +181,7 @@ async function initTesseract() {
     try {
         if (typeof Tesseract === 'undefined') {
             showError('Tesseract.js が読み込まれていません（CDNスクリプトを確認してください）');
+            renderEngineOverlay();
             return;
         }
         const { createWorker } = Tesseract;
@@ -186,9 +191,11 @@ async function initTesseract() {
         window.tesseractWorker = worker;
         console.log('Tesseract.js 初期化完了');
         tesseractReady = true;
+        renderEngineOverlay();
     } catch (error) {
         console.error('Tesseract.js 初期化失敗:', error);
         showError('OCRエンジンの初期化に失敗しました');
+        renderEngineOverlay();
     }
 }
 
@@ -212,6 +219,95 @@ function waitForEnginesReady(timeoutMs = 20000) {
             }
         }, 100);
     });
+}
+
+// ============================================
+// エンジン初期化の視覚的インジケータ
+// ============================================
+function ensureEngineOverlay() {
+    let el = document.getElementById('engineOverlay');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'engineOverlay';
+        el.style.position = 'fixed';
+        el.style.left = '20px';
+        el.style.bottom = '20px';
+        el.style.zIndex = '9999';
+        el.style.background = 'rgba(20,20,24,0.9)';
+        el.style.border = '1px solid #3a3a40';
+        el.style.borderRadius = '10px';
+        el.style.padding = '12px 16px';
+        el.style.color = '#e6e6ef';
+        el.style.fontSize = '14px';
+        el.style.boxShadow = '0 8px 24px rgba(0,0,0,0.4)';
+        el.innerHTML = `
+            <div id="engineTitle" style="font-weight:600;margin-bottom:8px;">エンジン初期化中…</div>
+            <div style="display:flex;gap:12px;margin-bottom:8px;">
+                <div id="cvStatus">OpenCV: <span>-</span></div>
+                <div id="ocrStatus">Tesseract: <span>-</span></div>
+            </div>
+            <div id="engineCountdown" style="opacity:0.85;">残り -- 秒</div>
+            <div id="engineActions" style="margin-top:8px;display:none;">
+                <button id="retryBtn" style="padding:6px 10px;border-radius:6px;border:1px solid #555;background:#2a2a32;color:#e6e6ef;cursor:pointer;">再試行</button>
+            </div>
+        `;
+        document.body.appendChild(el);
+        const retryBtn = document.getElementById('retryBtn');
+        if (retryBtn) {
+            retryBtn.addEventListener('click', () => {
+                initTesseract();
+                waitForOpenCV();
+                startEngineOverlayWait(20000);
+            });
+        }
+    }
+    return el;
+}
+
+function renderEngineOverlay() {
+    const el = document.getElementById('engineOverlay');
+    if (!el) return;
+    const cvSpan = el.querySelector('#cvStatus span');
+    const ocrSpan = el.querySelector('#ocrStatus span');
+    const title = el.querySelector('#engineTitle');
+    if (cvSpan) cvSpan.textContent = openCVReady ? '準備完了 ✓' : '初期化中…';
+    if (ocrSpan) ocrSpan.textContent = tesseractReady ? '準備完了 ✓' : '初期化中…';
+    if (title) title.textContent = enginesReady() ? 'エンジン準備完了' : 'エンジン初期化中…';
+}
+
+function startEngineOverlayWait(timeoutMs) {
+    const el = ensureEngineOverlay();
+    engineWaitDeadline = Date.now() + timeoutMs;
+    renderEngineOverlay();
+    const countdownEl = el.querySelector('#engineCountdown');
+    const actionsEl = el.querySelector('#engineActions');
+    if (actionsEl) actionsEl.style.display = 'none';
+    el.style.display = 'block';
+    if (engineWaitTimerId) clearInterval(engineWaitTimerId);
+    engineWaitTimerId = setInterval(() => {
+        const remain = Math.max(0, Math.ceil((engineWaitDeadline - Date.now()) / 1000));
+        if (countdownEl) countdownEl.textContent = enginesReady() ? '準備完了' : `残り ${remain} 秒`;
+        renderEngineOverlay();
+        if (enginesReady()) {
+            stopEngineOverlayWait();
+        }
+        if (remain <= 0 && !enginesReady()) {
+            const title = el.querySelector('#engineTitle');
+            if (title) title.textContent = '初期化がタイムアウトしました';
+            if (actionsEl) actionsEl.style.display = 'block';
+            clearInterval(engineWaitTimerId);
+            engineWaitTimerId = null;
+        }
+    }, 200);
+}
+
+function stopEngineOverlayWait() {
+    const el = document.getElementById('engineOverlay');
+    if (engineWaitTimerId) {
+        clearInterval(engineWaitTimerId);
+        engineWaitTimerId = null;
+    }
+    if (el) el.style.display = 'none';
 }
 
 /**
@@ -352,12 +448,16 @@ async function handleImageFile(file) {
         if (!enginesReady()) {
             showMessage('エンジン初期化中…準備完了次第処理します', 'success');
             try {
+                startEngineOverlayWait(30000);
                 await waitForEnginesReady(30000);
             } catch (e) {
+                renderEngineOverlay();
                 showError(e.message || 'エンジン初期化待機に失敗しました');
                 return;
             }
         }
+        // 念のためオーバーレイを閉じる
+        stopEngineOverlayWait();
         showLoading(true);
         hideError();
         const img = new Image();
