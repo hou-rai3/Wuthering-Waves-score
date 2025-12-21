@@ -145,6 +145,13 @@ function waitForOpenCV() {
             clearInterval(checkInterval);
         }
     }, 100);
+    // WebAssemblyの初期化完了イベント
+    if (typeof cv !== 'undefined') {
+        cv['onRuntimeInitialized'] = () => {
+            console.log('OpenCV.js Runtime Initialized');
+            openCVReady = true;
+        };
+    }
     
     // タイムアウト（30秒）
     setTimeout(() => {
@@ -160,7 +167,10 @@ function waitForOpenCV() {
 async function initTesseract() {
     try {
         const { createWorker } = Tesseract;
-        window.tesseractWorker = await createWorker('jpn');
+        const worker = await createWorker({ logger: (m) => console.log(m) });
+        await worker.loadLanguage('jpn');
+        await worker.initialize('jpn');
+        window.tesseractWorker = worker;
         console.log('Tesseract.js 初期化完了');
         tesseractReady = true;
     } catch (error) {
@@ -493,17 +503,26 @@ async function processStatusArea(img, scale) {
         const denoised = new cv.Mat();
         cv.morphologyEx(binary, denoised, cv.MORPH_OPEN, kernel);
         
-        // 設定値を使用してクロップ領域を計算
-        const cropX = Math.floor(img.width * (settingsManager.get('cropX') / 100));
-        const cropY = Math.floor(img.height * (settingsManager.get('cropY') / 100));
-        const cropW = Math.floor(img.width * (settingsManager.get('cropW') / 100));
-        const cropH = Math.floor(img.height * (settingsManager.get('cropH') / 100));
+        // 設定値を使用してクロップ領域を計算（範囲チェック付き）
+        let cropX = Math.floor(img.width * (settingsManager.get('cropX') / 100));
+        let cropY = Math.floor(img.height * (settingsManager.get('cropY') / 100));
+        let cropW = Math.floor(img.width * (settingsManager.get('cropW') / 100));
+        let cropH = Math.floor(img.height * (settingsManager.get('cropH') / 100));
+
+        // 画像境界に収まるようにクランプ
+        cropX = Math.max(0, Math.min(cropX, img.width - 1));
+        cropY = Math.max(0, Math.min(cropY, img.height - 1));
+        cropW = Math.max(1, Math.min(cropW, img.width - cropX));
+        cropH = Math.max(1, Math.min(cropH, img.height - cropY));
+        console.log('Crop Rect:', { cropX, cropY, cropW, cropH });
         
         // クロップ
         const roi = denoised.roi(new cv.Rect(cropX, cropY, cropW, cropH));
         
         // 処理済み画像をCanvasに表示
         const processedCanvas = document.getElementById('processedCanvas');
+        processedCanvas.width = cropW;
+        processedCanvas.height = cropH;
         cv.imshow(processedCanvas, roi);
         
         // クロップ画像を別Canvasに表示
@@ -511,9 +530,10 @@ async function processStatusArea(img, scale) {
         croppedCanvas.width = cropW;
         croppedCanvas.height = cropH;
         const croppedCtx = croppedCanvas.getContext('2d');
-        croppedCtx.drawImage(document.getElementById('originalCanvas'), 
-                             cropX, cropY, cropW, cropH, 
-                             0, 0, cropW, cropH);
+        croppedCtx.imageSmoothingEnabled = false;
+        croppedCtx.drawImage(document.getElementById('originalCanvas'),
+            cropX, cropY, cropW, cropH,
+            0, 0, cropW, cropH);
         
         // メモリ解放
         src.delete();
