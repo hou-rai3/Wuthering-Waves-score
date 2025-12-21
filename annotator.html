@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<title>座標アノテータ</title>
+<style>
+:root {
+  --bg: #0f1b2d;
+  --panel: #16263c;
+  --accent: #25c2a0;
+  --accent-2: #7fe7c4;
+  --text: #eef5ff;
+  --muted: #9db2d0;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 16px;
+  min-height: 100vh;
+  font-family: "Noto Sans JP", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 16px;
+}
+
+.canvas-area {
+  background: var(--panel);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+  padding: 12px;
+  position: relative;
+}
+
+canvas {
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  display: block;
+  max-width: 100%;
+  cursor: crosshair;
+}
+
+.sidebar {
+  background: var(--panel);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 100vh;
+  overflow-y: auto;
+}
+
+.sidebar h3 { margin: 0; font-size: 14px; color: var(--muted); }
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+input, select {
+  padding: 8px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 12px;
+}
+
+button {
+  padding: 8px;
+  background: rgba(37,194,160,0.25);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--accent);
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 120ms ease;
+}
+button:hover { background: rgba(37,194,160,0.4); }
+button:active { transform: translateY(1px); }
+
+.btn-secondary {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.12);
+  color: var(--text);
+}
+.btn-secondary:hover { background: rgba(255,255,255,0.12); }
+
+.info {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.boxes-list {
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+  padding: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  font-size: 12px;
+}
+
+.box-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 4px;
+  margin-bottom: 4px;
+}
+
+.box-item:last-child { margin-bottom: 0; }
+.box-label { flex: 1; }
+.box-del {
+  background: #ff6b6b;
+  border: none;
+  color: white;
+  padding: 2px 6px;
+  font-size: 10px;
+  cursor: pointer;
+  border-radius: 3px;
+}
+.box-del:hover { background: #ff5252; }
+
+textarea {
+  padding: 8px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: monospace;
+  font-size: 11px;
+  resize: vertical;
+  min-height: 120px;
+}
+
+@media (max-width: 1024px) {
+  body { grid-template-columns: 1fr; }
+  .sidebar { max-height: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="canvas-area">
+  <canvas id="canvas"></canvas>
+</div>
+
+<div class="sidebar">
+  <h3>📍 アノテータ</h3>
+  
+  <div class="input-group">
+    <label>画像ファイル</label>
+    <input type="file" id="imageInput" accept="image/*" />
+  </div>
+
+  <div class="info">
+    画像をアップロード後、ドラッグで矩形を描画します。各ボックスにラベルを付けて保存。
+  </div>
+
+  <div class="input-group">
+    <label>ラベル名</label>
+    <input type="text" id="labelInput" placeholder="例: 攻撃力, 会心率" />
+  </div>
+
+  <button onclick="addBox()">ボックス追加</button>
+  <button class="btn-secondary" onclick="clearLast()">最後を削除</button>
+  <button class="btn-secondary" onclick="clearAll()">全削除</button>
+
+  <h3>📦 登録済みボックス</h3>
+  <div class="boxes-list" id="boxesList">
+    (未登録)
+  </div>
+
+  <h3>📋 JSON 出力</h3>
+  <textarea id="jsonOutput" readonly>[]</textarea>
+  <button onclick="copyJSON()">コピー</button>
+  <button class="btn-secondary" onclick="downloadJSON()">ダウンロード</button>
+</div>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const imageInput = document.getElementById("imageInput");
+const labelInput = document.getElementById("labelInput");
+const boxesList = document.getElementById("boxesList");
+const jsonOutput = document.getElementById("jsonOutput");
+
+let image = null;
+let boxes = [];
+let dragging = false;
+let startX, startY;
+let rect = null;
+
+// Image upload
+imageInput.addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    image = new Image();
+    image.onload = () => {
+      canvas.width = image.width;
+      canvas.height = image.height;
+      redraw();
+    };
+    image.src = evt.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+// Mouse events
+canvas.addEventListener("mousedown", (e) => {
+  if (!image) return;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  startX = Math.round((e.clientX - rect.left) * scaleX);
+  startY = Math.round((e.clientY - rect.top) * scaleY);
+  dragging = true;
+});
+
+canvas.addEventListener("mousemove", (e) => {
+  if (!dragging || !image) return;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const x = Math.round((e.clientX - rect.left) * scaleX);
+  const y = Math.round((e.clientY - rect.top) * scaleY);
+  const w = x - startX;
+  const h = y - startY;
+  
+  // Preview
+  redraw();
+  if (w !== 0 && h !== 0) {
+    ctx.strokeStyle = "#25c2a0";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(startX, startY, w, h);
+    ctx.fillStyle = "rgba(37,194,160,0.1)";
+    ctx.fillRect(startX, startY, w, h);
+  }
+});
+
+canvas.addEventListener("mouseup", (e) => {
+  if (!dragging) return;
+  dragging = false;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const endX = Math.round((e.clientX - rect.left) * scaleX);
+  const endY = Math.round((e.clientY - rect.top) * scaleY);
+  
+  const x = Math.min(startX, endX);
+  const y = Math.min(startY, endY);
+  const w = Math.abs(endX - startX);
+  const h = Math.abs(endY - startY);
+  
+  if (w > 10 && h > 10) {
+    const label = labelInput.value || `box_${boxes.length + 1}`;
+    boxes.push({ x, y, w, h, name: label });
+    labelInput.value = "";
+    redraw();
+    updateList();
+  }
+});
+
+function redraw() {
+  if (!image) return;
+  ctx.drawImage(image, 0, 0);
+  
+  boxes.forEach((b, i) => {
+    ctx.strokeStyle = i === boxes.length - 1 ? "#7fe7c4" : "#25c2a0";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(b.x, b.y, b.w, b.h);
+    
+    // Label
+    ctx.fillStyle = i === boxes.length - 1 ? "#7fe7c4" : "#25c2a0";
+    ctx.font = "12px monospace";
+    ctx.fillText(b.name, b.x + 4, b.y + 16);
+  });
+}
+
+function updateList() {
+  if (boxes.length === 0) {
+    boxesList.innerHTML = "(未登録)";
+    return;
+  }
+  boxesList.innerHTML = boxes.map((b, i) => `
+    <div class="box-item">
+      <span class="box-label">${i + 1}. ${b.name}</span>
+      <button class="box-del" onclick="deleteBox(${i})">×</button>
+    </div>
+  `).join("");
+  updateJSON();
+}
+
+function deleteBox(i) {
+  boxes.splice(i, 1);
+  redraw();
+  updateList();
+}
+
+function clearLast() {
+  if (boxes.length > 0) boxes.pop();
+  redraw();
+  updateList();
+}
+
+function clearAll() {
+  if (confirm("全ボックスを削除しますか？")) {
+    boxes = [];
+    redraw();
+    updateList();
+  }
+}
+
+function addBox() {
+  if (!image) {
+    alert("先に画像をアップロードしてください");
+    return;
+  }
+  alert("キャンバス上にドラッグで矩形を描画してください");
+}
+
+function updateJSON() {
+  jsonOutput.value = JSON.stringify(boxes, null, 2);
+}
+
+function copyJSON() {
+  jsonOutput.select();
+  document.execCommand("copy");
+  alert("クリップボードにコピーしました！");
+}
+
+function downloadJSON() {
+  const data = JSON.stringify(boxes, null, 2);
+  const blob = new Blob([data], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "boxes.json";
+  a.click();
+}
+</script>
+
+</body>
+</html>
