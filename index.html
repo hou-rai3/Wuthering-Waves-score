@@ -12,6 +12,11 @@
     <div class="badge">ゼロ・ウェイティング</div>
   </div>
   <p class="lead">ステータス画面をコピーしてペーストしてください (Ctrl+V)。モデルは起動直後にウォームアップされます。</p>
+  <div class="dropzone" id="dropzone">
+    <div class="drop-icon">⭳</div>
+    <div class="drop-text">ここにペースト / ドロップ</div>
+    <div class="drop-sub">クリップボード画像やスクリーンショットをそのまま投入できます。フルHD推奨。</div>
+  </div>
   <div class="status-row">
     <div class="status-text" id="status">モデル読み込み中...</div>
     <div class="badge" aria-live="polite">リアルタイム解析</div>
@@ -37,10 +42,17 @@ const hidden = document.getElementById("hidden");
 const ctx = hidden.getContext("2d");
 const resetBtn = document.getElementById("reset-btn");
 const sampleBtn = document.getElementById("sample-btn");
+const dropZone = document.getElementById("dropzone");
 
 const worker = new Worker(URL.createObjectURL(new Blob([`
   self.onmessage = async (ev) => {
     const { imageData, boxes, modelUrl, classes, weights } = ev.data;
+    if (!self.tfjs) {
+      self.tfjs = await import(modelUrl);
+    }
+    if (!self.model) {
+      self.model = await self.tfjs.loadGraphModel(weights);
+    }
     const { data, width, height } = imageData;
     // simple binarization
     const bin = (arr) => {
@@ -51,8 +63,6 @@ const worker = new Worker(URL.createObjectURL(new Blob([`
       }
       return out;
     };
-    const tfjs = await import(modelUrl);
-    const model = await tfjs.loadGraphModel(weights);
     const preds = [];
     const binAll = bin(data);
     for (const b of boxes){
@@ -73,13 +83,12 @@ const worker = new Worker(URL.createObjectURL(new Blob([`
           resized[r*tgt+c] = crop[sr*w+sc] / 255;
         }
       }
-      const input = tf.tensor(resized, [1, tgt, tgt, 1]);
-      const p = model.predict(input);
+      const input = self.tfjs.tensor(resized, [1, tgt, tgt, 1]);
+      const p = self.model.predict(input);
       const idx = (await p.argMax(-1).data())[0];
       preds.push(classes[idx]);
-      tf.dispose([input, p]);
+      self.tfjs.dispose([input, p]);
     }
-    model.dispose();
     self.postMessage(preds);
   };
 `], { type: "application/javascript" })));
@@ -122,25 +131,7 @@ document.addEventListener("paste", async (e) => {
   const item = [...e.clipboardData.items].find(i => i.type.startsWith("image/"));
   if (!item) { statusEl.textContent = "画像が見つかりませんでした"; return; }
   const file = item.getAsFile();
-  const bmp = await createImageBitmap(file);
-  hidden.width = bmp.width; hidden.height = bmp.height;
-  ctx.drawImage(bmp, 0, 0);
-  const imgData = ctx.getImageData(0, 0, bmp.width, bmp.height);
-  statusEl.textContent = "解析中...";
-  worker.onmessage = (ev) => {
-    const preds = ev.data; // per box labels
-    // TODO: map preds to fields and compute score
-    const score = computeScore(preds);
-    scoreEl.textContent = score.toFixed(2);
-    statusEl.textContent = "完了";
-  };
-  worker.postMessage({
-    imageData: imgData,
-    boxes: scaleBoxes(bmp.width, bmp.height),
-    modelUrl: "https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js",
-    classes: CLASSES,
-    weights: location.origin + "/web_model/model.json"
-  });
+  await handleFile(file);
 });
 
 function computeScore(preds){
@@ -162,6 +153,54 @@ resetBtn.addEventListener("click", () => {
 
 sampleBtn.addEventListener("click", () => {
   statusEl.textContent = "サンプル画像機能は未設定です。クリップボードからペーストしてください。";
+});
+
+function setStatus(message, busy=false) {
+  statusEl.textContent = message;
+  dropZone.dataset.state = busy ? "busy" : "idle";
+}
+
+async function handleFile(file) {
+  if (!file) { setStatus("画像が見つかりませんでした", false); return; }
+  setStatus("解析中...", true);
+  const bmp = await createImageBitmap(file);
+  hidden.width = bmp.width; hidden.height = bmp.height;
+  ctx.drawImage(bmp, 0, 0);
+  const imgData = ctx.getImageData(0, 0, bmp.width, bmp.height);
+  worker.onmessage = (ev) => {
+    const preds = ev.data;
+    const score = computeScore(preds);
+    scoreEl.textContent = score.toFixed(2);
+    setStatus("完了", false);
+  };
+  worker.postMessage({
+    imageData: imgData,
+    boxes: scaleBoxes(bmp.width, bmp.height),
+    modelUrl: "https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js",
+    classes: CLASSES,
+    weights: location.origin + "/web_model/model.json"
+  });
+}
+
+// Drag & Drop support
+["dragenter","dragover"].forEach(evt => {
+  dropZone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    dropZone.classList.add("active");
+  });
+});
+
+["dragleave","drop"].forEach(evt => {
+  dropZone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    dropZone.classList.remove("active");
+  });
+});
+
+dropZone.addEventListener("drop", async (e) => {
+  if (!warm) return;
+  const file = [...e.dataTransfer.files].find(f => f.type.startsWith("image/"));
+  await handleFile(file);
 });
 </script>
 </body>
