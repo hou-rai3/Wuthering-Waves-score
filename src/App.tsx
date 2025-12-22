@@ -188,12 +188,16 @@ export default function App() {
       const scoreDetails = calculateScoreWithBreakdown(allStatNames, allPercentages, selectedCharacter);
       const rank = getScoreRank(scoreDetails.score);
       
+      // 丸め込みされたステータス名を取得
+      const correctedMain1 = scoreDetails.breakdown[0]?.statName || cleanedMain1;
+      const correctedSubs = scoreDetails.breakdown.slice(1).map(item => item.statName);
+      
       setResult({
         name: characterName,
         cost: extractNumber(costRes.text),
-        main1: cleanedMain1,
+        main1: correctedMain1,
         main2: cleanedMain2,
-        subs: cleanedSubs,
+        subs: correctedSubs,
         score: scoreDetails.score,
         rank,
         scoreDetails,

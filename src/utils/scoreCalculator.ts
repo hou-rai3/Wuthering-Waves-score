@@ -16,6 +16,9 @@ export function cleanText(text: string): string {
   // 数字の前にスペースを追加
   cleaned = cleaned.replace(/([^\d\s])(\d)/g, '$1 $2');
   
+  // 小数点の後の余分なスペースを削除（"30. 0" → "30.0"）
+  cleaned = cleaned.replace(/(\d+)\.\s+(\d+)/g, '$1.$2');
+  
   return cleaned.trim();
 }
 
