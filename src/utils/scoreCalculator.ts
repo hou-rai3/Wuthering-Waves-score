@@ -229,11 +229,8 @@ export function calculateScore(statTexts: string[], percentages: number[], chara
  * スコアの評価ランク
  */
 export function getScoreRank(score: number): string {
-  if (score >= 100) return 'SSS';
-  if (score >= 90) return 'SS';
-  if (score >= 80) return 'S';
-  if (score >= 70) return 'A';
-  if (score >= 60) return 'B';
-  if (score >= 50) return 'C';
-  return 'D';
+  if (score >= 65) return 'SS';
+  if (score >= 45) return 'S';
+  if (score >= 25) return 'A';
+  return 'B';
 }
