@@ -176,11 +176,11 @@ export default function App() {
       const cleanedMain2 = cleanText(main2Res.text);
       const cleanedSubs = rois.regions.subs.map((_, i) => cleanText(results[`sub${i + 1}`].text));
 
-      // OCR認識結果から%値を抽出（cleanText + extractPercentage を使用）
+      // OCR生テキストから%値を直接抽出（cleanTextする前）
       const allStatNames = [cleanedMain1, ...cleanedSubs];
       const allPercentages = [
-        extractPercentage(cleanedMain1),
-        ...cleanedSubs.map((sub) => extractPercentage(sub)),
+        extractPercentage(main1Res.text),
+        ...rois.regions.subs.map((_, i) => extractPercentage(results[`sub${i + 1}`].text)),
       ];
 
       // スコア計算
