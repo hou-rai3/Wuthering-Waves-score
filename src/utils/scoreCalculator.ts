@@ -98,33 +98,80 @@ function getStatWeight(statName: string, characterName?: string): number {
 }
 
 /**
- * スコア計算
+ * スコア計算の詳細情報
+ */
+export type ScoreDetail = {
+  score: number;
+  breakdown: Array<{
+    type: 'main1' | 'sub';
+    index?: number;
+    statName: string;
+    percentage: number;
+    weight: number;
+    contribution: number;
+  }>;
+};
+
+/**
+ * スコア計算（詳細情報付き）
  * @param main1 メインステータス1行目（ステータス名と%）
  * @param main2 メインステータス2行目（実数値 - 計算に含めない）
  * @param subs サブステータス配列
  */
-export function calculateScore(main1: string, _main2: string, subs: string[], characterName?: string): number {
+export function calculateScoreWithBreakdown(main1: string, _main2: string, subs: string[], characterName?: string): ScoreDetail {
   let score = 0;
+  const breakdown: ScoreDetail['breakdown'] = [];
   
   // メインステータスのスコア（1行目のみ、%のみを使用）
   const main1Cleaned = cleanText(main1);
   const main1Percentage = extractPercentage(main1Cleaned);
   const main1StatName = normalizeStatName(main1Cleaned);
   const main1Weight = getStatWeight(main1StatName, characterName);
+  const main1Contribution = main1Percentage * main1Weight;
   
-  score += main1Percentage * main1Weight;
+  score += main1Contribution;
+  breakdown.push({
+    type: 'main1',
+    statName: main1StatName,
+    percentage: main1Percentage,
+    weight: main1Weight,
+    contribution: Math.round(main1Contribution * 10) / 10,
+  });
   
   // サブステータスのスコア（%のみを使用）
-  for (const sub of subs) {
+  for (let i = 0; i < subs.length; i++) {
+    const sub = subs[i];
     const subCleaned = cleanText(sub);
     const subPercentage = extractPercentage(subCleaned);
     const subStatName = normalizeStatName(subCleaned);
     const subWeight = getStatWeight(subStatName, characterName);
+    const subContribution = subPercentage * subWeight;
     
-    score += subPercentage * subWeight;
+    score += subContribution;
+    breakdown.push({
+      type: 'sub',
+      index: i + 1,
+      statName: subStatName,
+      percentage: subPercentage,
+      weight: subWeight,
+      contribution: Math.round(subContribution * 10) / 10,
+    });
   }
   
-  return Math.round(score * 10) / 10; // 小数点1桁に丸める
+  return {
+    score: Math.round(score * 10) / 10,
+    breakdown,
+  };
+}
+
+/**
+ * スコア計算（従来の戻り値）
+ * @param main1 メインステータス1行目（ステータス名と%）
+ * @param main2 メインステータス2行目（実数値 - 計算に含めない）
+ * @param subs サブステータス配列
+ */
+export function calculateScore(main1: string, main2: string, subs: string[], characterName?: string): number {
+  return calculateScoreWithBreakdown(main1, main2, subs, characterName).score;
 }
 
 /**

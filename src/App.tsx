@@ -3,7 +3,7 @@ import { extractEchoRois } from './utils/imageProcessor';
 import { useOcr } from './hooks/useOcr';
 import { DebugPanel } from './components/DebugPanel';
 import { loadRoiConfig, saveRoiConfig, type RoiConfig } from './utils/roiConfig';
-import { cleanText, calculateScore, getScoreRank } from './utils/scoreCalculator';
+import { cleanText, getScoreRank, calculateScoreWithBreakdown } from './utils/scoreCalculator';
 
 type EchoScore = {
   name: string;
@@ -13,6 +13,7 @@ type EchoScore = {
   subs: string[];
   score: number;
   rank: string;
+  scoreDetails?: any;
 };
 
 export default function App() {
@@ -177,8 +178,8 @@ export default function App() {
 
       // スコア計算
       const characterName = cleanText(nameRes.text);
-      const score = calculateScore(cleanedMain1, cleanedMain2, cleanedSubs, selectedCharacter);
-      const rank = getScoreRank(score);
+      const scoreDetails = calculateScoreWithBreakdown(cleanedMain1, cleanedMain2, cleanedSubs, selectedCharacter);
+      const rank = getScoreRank(scoreDetails.score);
       
       setResult({
         name: characterName,
@@ -186,8 +187,9 @@ export default function App() {
         main1: cleanedMain1,
         main2: cleanedMain2,
         subs: cleanedSubs,
-        score,
+        score: scoreDetails.score,
         rank,
+        scoreDetails,
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'OCR処理に失敗しました';
@@ -358,6 +360,32 @@ export default function App() {
           <h3 className="text-sm font-semibold mb-2 text-slate-400">認識領域</h3>
           <div className="border bg-black rounded overflow-auto max-h-64">
             <img src={debugImageUrl} alt="認識領域" className="max-w-full" />
+          </div>
+        </div>
+      )}
+
+      {/* スコア計算詳細 */}
+      {result && debug && result.scoreDetails && (
+        <div className="rounded border border-slate-700 bg-slate-900 p-4 space-y-3">
+          <h3 className="text-sm font-semibold text-slate-400">計算式の詳細</h3>
+          <div className="space-y-2 font-mono text-sm">
+            {result.scoreDetails.breakdown.map((item: any, idx: number) => {
+              const label = item.type === 'main1' ? 'メイン' : `サブ${item.index}`;
+              return (
+                <div key={idx} className="bg-slate-800 p-2 rounded flex justify-between items-center">
+                  <span className="text-slate-300">
+                    {label} <span className="text-slate-400">({item.statName})</span>
+                  </span>
+                  <span className="text-emerald-400">
+                    {item.percentage}% × {item.weight.toFixed(2)} = <strong>{item.contribution}</strong>
+                  </span>
+                </div>
+              );
+            })}
+            <div className="bg-slate-700 p-2 rounded flex justify-between items-center border-t border-slate-600 mt-3 pt-3">
+              <span className="text-slate-100 font-semibold">合計スコア</span>
+              <span className="text-yellow-400 font-bold text-lg">{result.score}</span>
+            </div>
           </div>
         </div>
       )}
