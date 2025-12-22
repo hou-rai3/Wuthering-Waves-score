@@ -81,9 +81,12 @@ const CHARACTER_WEIGHTS: Record<string, Record<string, number>> = {
  * ステータス名から重みを取得
  */
 function getStatWeight(statName: string, characterName?: string): number {
+  console.log('[getStatWeight] statName:', statName, 'characterName:', characterName);
+  
   // キャラクター別の重みを使用
   if (characterName && CHARACTER_WEIGHTS[characterName]) {
     const table = CHARACTER_WEIGHTS[characterName];
+    console.log('[getStatWeight] テーブルが見つかりました:', Object.keys(table));
     
     // より具体的なキーから順にチェック（長い方から先にマッチング）
     const sortedKeys = Object.keys(table).sort((a, b) => b.length - a.length);
@@ -94,9 +97,13 @@ function getStatWeight(statName: string, characterName?: string): number {
       const normalizedStat = statName.replace(/[()（）]/g, '');
       
       if (normalizedStat.includes(normalizedKey) || statName.includes(key)) {
+        console.log('[getStatWeight] マッチしました:', key, '-> weight:', table[key]);
         return table[key];
       }
     }
+    console.log('[getStatWeight] マッチなし、デフォルト値を返します');
+  } else {
+    console.log('[getStatWeight] キャラクターテーブルが見つかりません');
   }
 
   // キャラクター指定なしまたは該当なしの場合はデフォルト値
