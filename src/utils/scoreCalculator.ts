@@ -21,10 +21,22 @@ export function cleanText(text: string): string {
 
 /**
  * テキストから数値（%）を抽出
+ * %記号の有無に関わらず、最初の数値を抽出
  */
 export function extractPercentage(text: string): number {
-  const match = text.match(/([\d.]+)%/);
-  return match ? parseFloat(match[1]) : 0;
+  // %記号がある場合はそれを使用
+  const matchWithPercent = text.match(/([\d.]+)\s*%/);
+  if (matchWithPercent) {
+    return parseFloat(matchWithPercent[1]);
+  }
+  
+  // %記号がない場合は最初の数値を使用
+  const matchNumber = text.match(/([\d.]+)/);
+  if (matchNumber) {
+    return parseFloat(matchNumber[1]);
+  }
+  
+  return 0;
 }
 
 /**
