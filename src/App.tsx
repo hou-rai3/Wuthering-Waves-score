@@ -28,6 +28,7 @@ export default function App() {
   const [threshold, setThreshold] = useState<number>(128);
   const [ocrResults, setOcrResults] = useState<Record<string, { text: string; confidence: number }>>({});
   const [selectedCharacter, setSelectedCharacter] = useState<string>('カルロッタ');
+  const [imgUrl, setImgUrl] = useState<string | null>(null);
 
   const { recognize, ready, loading, error: ocrError } = useOcr();
 
@@ -122,6 +123,7 @@ export default function App() {
       }
 
       const url = URL.createObjectURL(file);
+      setImgUrl(url);
       const img = new Image();
       img.onload = () => {
         setImgEl(img);
@@ -305,6 +307,17 @@ export default function App() {
           </label>
         </div>
       </div>
+
+      {/* Image Preview */}
+      {imgUrl && (
+        <div className="rounded border border-slate-700 bg-slate-900 p-4 flex justify-center items-center max-h-96 overflow-hidden">
+          <img 
+            src={imgUrl} 
+            alt="Preview" 
+            className="max-w-full max-h-full object-contain"
+          />
+        </div>
+      )}
 
       {/* Debug Panel */}
       <DebugPanel
