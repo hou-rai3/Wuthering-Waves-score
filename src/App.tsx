@@ -3,7 +3,7 @@ import { extractEchoRois } from './utils/imageProcessor';
 import { useOcr } from './hooks/useOcr';
 import { DebugPanel } from './components/DebugPanel';
 import { loadRoiConfig, saveRoiConfig, type RoiConfig } from './utils/roiConfig';
-import { cleanText, getScoreRank, calculateScoreWithBreakdown } from './utils/scoreCalculator';
+import { cleanText, getScoreRank, calculateScoreWithBreakdown, extractPercentage } from './utils/scoreCalculator';
 
 type EchoScore = {
   name: string;
@@ -176,15 +176,11 @@ export default function App() {
       const cleanedMain2 = cleanText(main2Res.text);
       const cleanedSubs = rois.regions.subs.map((_, i) => cleanText(results[`sub${i + 1}`].text));
 
-      // OCR認識結果から%値を直接抽出
+      // OCR認識結果から%値を抽出（cleanText + extractPercentage を使用）
       const allStatNames = [cleanedMain1, ...cleanedSubs];
       const allPercentages = [
-        parseFloat(main1Res.text.match(/(\d+\.?\d*)/)?.[1] || '0'),
-        ...rois.regions.subs.map((_, i) => {
-          const text = results[`sub${i + 1}`].text;
-          const match = text.match(/(\d+\.?\d*)/);
-          return parseFloat(match?.[1] || '0');
-        }),
+        extractPercentage(cleanedMain1),
+        ...cleanedSubs.map((sub) => extractPercentage(sub)),
       ];
 
       // スコア計算
