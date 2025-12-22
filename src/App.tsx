@@ -310,11 +310,11 @@ export default function App() {
 
       {/* Image Preview */}
       {imgUrl && (
-        <div className="rounded border border-slate-700 bg-slate-900 p-4 flex justify-center items-center max-h-96 overflow-hidden">
+        <div className="rounded border border-slate-700 bg-slate-900 p-4 flex justify-center items-center min-h-96 max-h-[600px] overflow-auto">
           <img 
             src={imgUrl} 
             alt="Preview" 
-            className="max-w-full max-h-full object-contain"
+            className="w-full h-auto object-contain"
           />
         </div>
       )}
