@@ -26,6 +26,7 @@ export default function App() {
   const [roiConfig, setRoiConfig] = useState<RoiConfig>(loadRoiConfig());
   const [threshold, setThreshold] = useState<number>(128);
   const [ocrResults, setOcrResults] = useState<Record<string, { text: string; confidence: number }>>({});
+  const [selectedCharacter, setSelectedCharacter] = useState<string>('カルロッタ');
 
   const { recognize, ready, loading, error: ocrError } = useOcr();
 
@@ -176,7 +177,7 @@ export default function App() {
 
       // スコア計算
       const characterName = cleanText(nameRes.text);
-      const score = calculateScore(cleanedMain1, cleanedMain2, cleanedSubs, characterName);
+      const score = calculateScore(cleanedMain1, cleanedMain2, cleanedSubs, selectedCharacter);
       const rank = getScoreRank(score);
       
       setResult({
@@ -240,6 +241,14 @@ export default function App() {
         <span className="text-xs text-slate-400">音骸ステータス解析</span>
 
         <div className="flex gap-2 ml-auto">
+          <select
+            value={selectedCharacter}
+            onChange={(e) => setSelectedCharacter(e.target.value)}
+            className="px-3 py-1 rounded bg-slate-800 border border-slate-700 hover:bg-slate-700 text-sm"
+          >
+            <option value="カルロッタ">カルロッタ</option>
+            <option value="デフォルト">デフォルト</option>
+          </select>
           <button
             onClick={() => setDebug((v) => !v)}
             className="px-3 py-1 rounded bg-slate-800 border border-slate-700 hover:bg-slate-700 text-sm"
