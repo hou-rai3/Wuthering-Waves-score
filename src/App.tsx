@@ -4,7 +4,6 @@ import { useOcr } from './hooks/useOcr';
 import { DebugPanel } from './components/DebugPanel';
 import { loadRoiConfig, saveRoiConfig, type RoiConfig } from './utils/roiConfig';
 import { cleanText, getScoreRank, calculateScoreWithBreakdown, extractPercentage } from './utils/scoreCalculator';
-import './animations.css';
 
 type EchoScore = {
   name: string;
@@ -234,17 +233,17 @@ export default function App() {
 
   return (
     <div
-      className="min-h-screen bg-gradient-to-br from-amber-50 via-stone-100 to-lime-50 text-slate-800 p-6 space-y-6"
+      className="min-h-screen bg-slate-950 text-slate-100 p-4 space-y-4"
       onPaste={handlePaste}
       tabIndex={0}
     >
       {/* Toast */}
       {toast && (
         <div
-          className={`fixed top-4 right-4 px-6 py-3 rounded-lg shadow-2xl border-2 animate-fade-in ${
+          className={`fixed top-4 right-4 px-4 py-2 rounded shadow-lg ${
             toast.type === 'error'
-              ? 'bg-red-50 border-red-400 text-red-800'
-              : 'bg-lime-50 border-lime-400 text-lime-900'
+              ? 'bg-red-600'
+              : 'bg-emerald-600'
           }`}
         >
           {toast.message}
@@ -252,31 +251,29 @@ export default function App() {
       )}
 
       {/* Header */}
-      <header className="flex flex-wrap items-center gap-3 mb-8 p-6 bg-gradient-to-r from-lime-100/80 via-amber-50/80 to-lime-100/80 rounded-2xl border-2 border-lime-300 shadow-xl backdrop-blur-sm">
-        <div className="flex-1">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-lime-700 to-emerald-600 bg-clip-text text-transparent drop-shadow-lg">鳴潮 自動スコア計算器</h1>
-          <span className="text-sm text-lime-700 font-medium">音骸ステータス解析</span>
-        </div>
+      <header className="flex flex-wrap items-center gap-2 mb-6">
+        <h1 className="text-2xl font-bold">鳴潮 自動スコア計算器</h1>
+        <span className="text-xs text-slate-400">音骸ステータス解析</span>
 
-        <div className="flex gap-3">
+        <div className="flex gap-2 ml-auto">
           <select
             value={selectedCharacter}
             onChange={(e) => setSelectedCharacter(e.target.value)}
-            className="px-4 py-2 rounded-xl bg-white border-2 border-lime-400 hover:border-lime-500 hover:bg-lime-50 text-sm font-medium text-lime-900 shadow-md transition-all duration-200 cursor-pointer"
+            className="px-3 py-1 rounded bg-slate-800 border border-slate-700 hover:bg-slate-700 text-sm"
           >
             <option value="カルロッタ">カルロッタ</option>
             <option value="デフォルト">デフォルト</option>
           </select>
           <button
             onClick={() => setDebug((v) => !v)}
-            className="px-4 py-2 rounded-xl bg-white border-2 border-amber-400 hover:border-amber-500 hover:bg-amber-50 text-sm font-medium text-amber-900 shadow-md transition-all duration-200"
+            className="px-3 py-1 rounded bg-slate-800 border border-slate-700 hover:bg-slate-700 text-sm"
           >
             {debug ? 'デバッグOFF' : 'デバッグON'}
           </button>
           <button
             disabled={!ready || !rois || loading}
             onClick={runOcr}
-            className="px-6 py-2 rounded-xl bg-gradient-to-r from-lime-500 to-emerald-500 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed text-sm font-bold text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200"
+            className="px-3 py-1 rounded bg-emerald-600 disabled:bg-slate-700 disabled:cursor-not-allowed text-sm hover:bg-emerald-500"
           >
             {loading ? '読込中...' : 'OCR実行'}
           </button>
@@ -286,16 +283,16 @@ export default function App() {
       {/* Upload Area or Image Preview */}
       {!imgUrl ? (
         <div
-          className="border-4 border-dashed border-lime-400 rounded-3xl p-12 text-center hover:border-lime-500 hover:bg-lime-50/30 transition-all duration-300 bg-white/60 backdrop-blur-sm shadow-xl"
+          className="border-2 border-dashed border-slate-600 rounded-lg p-8 text-center hover:border-slate-500 transition"
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault();
             handleFiles(e.dataTransfer.files);
           }}
         >
-          <div className="space-y-4">
-            <p className="text-xl font-bold text-lime-800">画像をドラッグ&ドロップ</p>
-            <p className="text-sm text-lime-600">または Ctrl+V でペースト</p>
+          <div className="space-y-2">
+            <p className="text-base font-medium">画像をドラッグ&ドロップ</p>
+            <p className="text-xs text-slate-400">または Ctrl+V でペースト</p>
             <input
               type="file"
               accept="image/*"
@@ -305,18 +302,18 @@ export default function App() {
             />
             <label
               htmlFor="file-input"
-              className="inline-block px-8 py-3 rounded-xl bg-gradient-to-r from-lime-400 to-emerald-400 border-2 border-lime-500 hover:from-lime-500 hover:to-emerald-500 text-sm font-bold text-white cursor-pointer shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200"
+              className="inline-block px-3 py-1 rounded bg-slate-800 border border-slate-700 hover:bg-slate-700 text-sm cursor-pointer"
             >
               ファイルを選択
             </label>
           </div>
         </div>
       ) : (
-        <div className="rounded-3xl border-4 border-lime-400 bg-white/80 backdrop-blur-sm p-6 flex justify-center items-center h-80 overflow-hidden shadow-2xl animate-fade-in">
+        <div className="rounded border border-slate-700 bg-slate-900 p-4 flex justify-center items-center h-80 overflow-hidden">
           <img 
             src={imgUrl} 
             alt="Preview" 
-            className="w-full h-full object-contain rounded-2xl"
+            className="w-full h-full object-contain"
           />
         </div>
       )}
@@ -342,34 +339,34 @@ export default function App() {
 
       {/* Result Display */}
       {result && (
-        <div className="rounded-3xl border-4 border-lime-400 bg-gradient-to-br from-white/90 to-lime-50/90 backdrop-blur-sm p-8 space-y-6 shadow-2xl animate-slide-up">
-          <div className="flex items-center justify-between border-b-2 border-lime-300 pb-4">
-            <h2 className="text-2xl font-bold text-lime-900">{result.name}</h2>
-            <span className="text-lg px-4 py-2 bg-gradient-to-r from-amber-400 to-yellow-400 rounded-xl font-bold text-white shadow-lg">COST {result.cost}</span>
+        <div className="rounded border-2 border-emerald-500 bg-slate-900 p-6 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-700 pb-3">
+            <h2 className="text-xl font-semibold">{result.name}</h2>
+            <span className="text-base px-3 py-1 bg-slate-800 rounded font-semibold">COST {result.cost}</span>
           </div>
           
           {/* スコア - 大きく表示 */}
-          <div className="bg-gradient-to-r from-lime-400/30 via-emerald-400/30 to-lime-400/30 p-8 rounded-2xl text-center border-2 border-lime-300 shadow-xl">
-            <div className="text-base text-lime-800 mb-3 font-semibold">総合スコア</div>
-            <div className="flex items-center justify-center gap-6">
-              <div className="text-7xl font-black bg-gradient-to-r from-lime-600 to-emerald-600 bg-clip-text text-transparent drop-shadow-lg animate-count-up">{result.score}</div>
-              <div className="text-5xl font-black text-yellow-500 drop-shadow-lg animate-bounce-in">{result.rank}</div>
+          <div className="bg-gradient-to-r from-emerald-900 to-slate-900 p-6 rounded-lg text-center">
+            <div className="text-sm text-slate-400 mb-2">総合スコア</div>
+            <div className="flex items-center justify-center gap-4">
+              <div className="text-6xl font-bold text-emerald-400">{result.score}</div>
+              <div className="text-3xl font-bold text-yellow-400">{result.rank}</div>
             </div>
           </div>
           
-                    <div className="space-y-4">
-                      <div className="bg-white/80 backdrop-blur-sm p-5 rounded-2xl border-2 border-lime-200 shadow-lg">
-                        <div className="text-sm text-lime-700 mb-3 font-bold">メインステータス</div>
-                        <div className="text-lg font-mono text-lime-900 font-semibold">{result.main1}</div>
-                        <div className="text-base font-mono text-lime-600 mt-1">{result.main2}</div>
+          <div className="space-y-3">
+            <div className="bg-slate-800 p-3 rounded">
+              <div className="text-xs text-slate-400 mb-2">メインステータス</div>
+              <div className="text-base font-mono">{result.main1}</div>
+              <div className="text-sm font-mono text-slate-500">{result.main2}</div>
             </div>
             
             {result.subs.length > 0 && (
-              <div className="bg-white/80 backdrop-blur-sm p-5 rounded-2xl border-2 border-lime-200 shadow-lg">
-                <div className="text-sm text-lime-700 mb-3 font-bold">サブステータス</div>
-                <div className="space-y-2">
+              <div className="bg-slate-800 p-3 rounded">
+                <div className="text-xs text-slate-400 mb-2">サブステータス</div>
+                <div className="space-y-1">
                   {result.subs.map((sub, i) => (
-                    <div key={i} className="text-base font-mono text-lime-900 animate-fade-in" style={{ animationDelay: `${i * 0.1}s` }}>
+                    <div key={i} className="text-base font-mono">
                       {i + 1}. {sub}
                     </div>
                   ))}
