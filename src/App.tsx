@@ -362,35 +362,38 @@ export default function App() {
 
       {/* Result Display */}
       {result && (
-        <div className="rounded border-2 border-emerald-500 bg-slate-900 p-6 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-700 pb-3">
-            <h2 className="text-xl font-semibold">{result.name}</h2>
-            <span className="text-base px-3 py-1 bg-slate-800 rounded font-semibold">COST {result.cost}</span>
+        <div className="relative rounded-2xl border-4 border-lime-300 bg-white/70 backdrop-blur-md p-8 space-y-6 shadow-2xl overflow-hidden animate-fade-in">
+          <div className="absolute inset-0 bg-gradient-to-br from-lime-50/50 to-emerald-50/50"></div>
+          
+          <div className="relative flex items-center justify-between border-b-2 border-lime-200 pb-4">
+            <h2 className="text-2xl font-bold text-slate-800">{result.name}</h2>
+            <span className="text-lg px-4 py-2 bg-gradient-to-r from-lime-500 to-emerald-500 text-white rounded-xl font-bold shadow-lg">COST {result.cost}</span>
           </div>
           
           {/* スコア - 大きく表示 */}
-          <div className="bg-gradient-to-r from-emerald-900 to-slate-900 p-6 rounded-lg text-center">
-            <div className="text-sm text-slate-400 mb-2">総合スコア</div>
-            <div className="flex items-center justify-center gap-4">
-              <div className="text-6xl font-bold text-emerald-400">{result.score}</div>
-              <div className="text-3xl font-bold text-yellow-400">{result.rank}</div>
+          <div className="relative bg-gradient-to-br from-lime-100 to-emerald-100 p-8 rounded-2xl text-center border-2 border-lime-300 shadow-lg">
+            <div className="text-sm text-slate-600 mb-3 font-semibold">総合スコア</div>
+            <div className="flex items-center justify-center gap-6">
+              <div className="text-7xl font-black bg-gradient-to-r from-lime-600 to-emerald-600 bg-clip-text text-transparent animate-pulse">{result.score}</div>
+              <div className="text-5xl font-black text-yellow-500 drop-shadow-lg">{result.rank}</div>
             </div>
           </div>
           
-          <div className="space-y-3">
-            <div className="bg-slate-800 p-3 rounded">
-              <div className="text-xs text-slate-400 mb-2">メインステータス</div>
-              <div className="text-base font-mono">{result.main1}</div>
-              <div className="text-sm font-mono text-slate-500">{result.main2}</div>
+          <div className="relative space-y-4">
+            <div className="bg-white/80 backdrop-blur-sm p-5 rounded-xl border-2 border-lime-200 shadow-md">
+              <div className="text-xs text-slate-600 mb-3 font-bold uppercase tracking-wider">メインステータス</div>
+              <div className="text-lg font-bold text-slate-800">{result.main1}</div>
+              <div className="text-sm font-mono text-slate-600 mt-1">{result.main2}</div>
             </div>
             
             {result.subs.length > 0 && (
-              <div className="bg-slate-800 p-3 rounded">
-                <div className="text-xs text-slate-400 mb-2">サブステータス</div>
-                <div className="space-y-1">
+              <div className="bg-white/80 backdrop-blur-sm p-5 rounded-xl border-2 border-lime-200 shadow-md">
+                <div className="text-xs text-slate-600 mb-3 font-bold uppercase tracking-wider">サブステータス</div>
+                <div className="space-y-2">
                   {result.subs.map((sub, i) => (
-                    <div key={i} className="text-base font-mono">
-                      {i + 1}. {sub}
+                    <div key={i} className="text-base font-semibold text-slate-700 flex items-center gap-2">
+                      <span className="flex items-center justify-center w-6 h-6 rounded-full bg-lime-500 text-white text-xs font-bold">{i + 1}</span>
+                      {sub}
                     </div>
                   ))}
                 </div>
