@@ -115,8 +115,9 @@ function calculateEditDistance(str1: string, str2: string): number {
 
 /**
  * ステータス名から重みを取得（ファジーマッチング使用）
+ * @returns {weight: 重み, matchedKey: マッチしたキー名}
  */
-function getStatWeight(statName: string, characterName?: string): number {
+function getStatWeight(statName: string, characterName?: string): { weight: number; matchedKey: string } {
   console.log('[getStatWeight] statName:', statName, 'characterName:', characterName);
   
   // キャラクター別の重みを使用
@@ -128,7 +129,7 @@ function getStatWeight(statName: string, characterName?: string): number {
     // 完全一致を最優先でチェック
     if (statName in table) {
       console.log('[getStatWeight] 完全一致:', statName, '-> weight:', table[statName]);
-      return table[statName];
+      return { weight: table[statName], matchedKey: statName };
     }
     
     // 正規化して比較（記号を削除）
@@ -149,13 +150,13 @@ function getStatWeight(statName: string, characterName?: string): number {
     }
     
     console.log('[getStatWeight] 最も近い一致:', bestMatch, '(距離:', bestDistance, ') -> weight:', table[bestMatch]);
-    return table[bestMatch];
+    return { weight: table[bestMatch], matchedKey: bestMatch };
   } else {
     console.log('[getStatWeight] キャラクターテーブルが見つかりません');
   }
 
   // キャラクター指定なしまたは該当なしの場合はデフォルト値
-  return 1.0;
+  return { weight: 1.0, matchedKey: statName };
 }
 
 /**
@@ -194,15 +195,15 @@ export function calculateScoreWithBreakdown(
   // メインステータス（インデックス0）
   const main1StatName = normalizeStatName(statTexts[0], statTexts[0]);
   const main1Percentage = percentages[0];
-  const main1Weight = getStatWeight(main1StatName, characterName);
-  const main1Contribution = main1Percentage * main1Weight;
+  const main1Result = getStatWeight(main1StatName, characterName);
+  const main1Contribution = main1Percentage * main1Result.weight;
 
   score += main1Contribution;
   breakdown.push({
     type: 'main1',
-    statName: main1StatName,
+    statName: main1Result.matchedKey,
     percentage: main1Percentage,
-    weight: main1Weight,
+    weight: main1Result.weight,
     contribution: Math.round(main1Contribution * 10) / 10,
   });
 
@@ -210,16 +211,16 @@ export function calculateScoreWithBreakdown(
   for (let i = 1; i < statTexts.length; i++) {
     const subStatName = normalizeStatName(statTexts[i], statTexts[i]);
     const subPercentage = percentages[i];
-    const subWeight = getStatWeight(subStatName, characterName);
-    const subContribution = subPercentage * subWeight;
+    const subResult = getStatWeight(subStatName, characterName);
+    const subContribution = subPercentage * subResult.weight;
 
     score += subContribution;
     breakdown.push({
       type: 'sub',
       index: i,
-      statName: subStatName,
+      statName: subResult.matchedKey,
       percentage: subPercentage,
-      weight: subWeight,
+      weight: subResult.weight,
       contribution: Math.round(subContribution * 10) / 10,
     });
   }
