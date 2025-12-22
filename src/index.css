@@ -2,12 +2,40 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700;900&display=swap');
+
 @layer base {
+  * {
+    font-family: 'Noto Sans JP', sans-serif;
+  }
+  
   body {
-    @apply bg-gradient-to-br from-amber-50 via-stone-100 to-lime-50;
+    @apply bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-950 text-slate-100 overflow-x-hidden;
   }
   
   #root {
     @apply min-h-screen;
+  }
+}
+
+@layer components {
+  .glass-effect {
+    @apply bg-white/10 backdrop-blur-md border border-white/20 rounded-xl;
+  }
+  
+  .gradient-border {
+    @apply relative bg-gradient-to-br from-emerald-400/20 to-cyan-400/20 rounded-2xl border border-emerald-400/30;
+  }
+  
+  .btn-primary {
+    @apply px-6 py-2 rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-900 font-semibold transition-all duration-300 shadow-lg hover:shadow-emerald-500/50;
+  }
+  
+  .btn-secondary {
+    @apply px-6 py-2 rounded-lg border-2 border-emerald-400/50 text-emerald-300 hover:border-emerald-300 hover:text-emerald-200 font-semibold transition-all duration-300 bg-slate-900/50 hover:bg-slate-800/80;
+  }
+  
+  .card-styled {
+    @apply rounded-2xl border border-emerald-400/20 bg-gradient-to-br from-slate-800/40 to-slate-900/40 backdrop-blur-sm shadow-xl;
   }
 }
