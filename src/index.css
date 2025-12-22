@@ -10,7 +10,7 @@
   }
   
   body {
-    @apply bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-950 text-slate-100 overflow-x-hidden;
+    @apply bg-gradient-to-br from-lime-100 via-yellow-50 to-green-100 text-slate-900 overflow-x-hidden;
   }
   
   #root {
@@ -20,22 +20,22 @@
 
 @layer components {
   .glass-effect {
-    @apply bg-white/10 backdrop-blur-md border border-white/20 rounded-xl;
+    @apply bg-white/80 backdrop-blur-md border border-lime-300/50 rounded-xl;
   }
   
   .gradient-border {
-    @apply relative bg-gradient-to-br from-emerald-400/20 to-cyan-400/20 rounded-2xl border border-emerald-400/30;
+    @apply relative bg-gradient-to-br from-lime-200/40 to-green-200/40 rounded-2xl border-2 border-lime-400/60;
   }
   
   .btn-primary {
-    @apply px-6 py-2 rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-900 font-semibold transition-all duration-300 shadow-lg hover:shadow-emerald-500/50;
+    @apply px-6 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-400 hover:to-purple-500 text-white font-bold transition-all duration-300 shadow-lg hover:shadow-purple-400/50 hover:scale-105;
   }
   
   .btn-secondary {
-    @apply px-6 py-2 rounded-lg border-2 border-emerald-400/50 text-emerald-300 hover:border-emerald-300 hover:text-emerald-200 font-semibold transition-all duration-300 bg-slate-900/50 hover:bg-slate-800/80;
+    @apply px-6 py-3 rounded-xl border-2 border-lime-600 text-lime-800 hover:border-lime-700 hover:bg-lime-50 font-bold transition-all duration-300 bg-white shadow-md;
   }
   
   .card-styled {
-    @apply rounded-2xl border border-emerald-400/20 bg-gradient-to-br from-slate-800/40 to-slate-900/40 backdrop-blur-sm shadow-xl;
+    @apply rounded-2xl border-2 border-lime-300 bg-white/90 backdrop-blur-sm shadow-xl;
   }
 }
