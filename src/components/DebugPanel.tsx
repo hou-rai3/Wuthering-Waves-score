@@ -45,7 +45,7 @@ export const DebugPanel: React.FC<Props> = ({
   show,
 }) => {
   const [binarizedUrl, setBinarizedUrl] = React.useState<string>();
-  const [tab, setTab] = React.useState<'rects' | 'binary' | 'info' | 'config' | 'regions'>('rects');
+  const [tab, setTab] = React.useState<'rects' | 'binary' | 'info' | 'config' | 'regions'>('info');
   const [regionUrls, setRegionUrls] = React.useState<Record<string, string>>({});
 
   React.useEffect(() => {
