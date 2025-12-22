@@ -1,3 +1,13 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gradient-to-br from-amber-50 via-stone-100 to-lime-50;
+  }
+  
+  #root {
+    @apply min-h-screen;
+  }
+}
