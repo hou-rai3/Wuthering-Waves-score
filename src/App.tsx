@@ -233,7 +233,7 @@ export default function App() {
 
   return (
     <div
-      className="min-h-screen bg-gradient-to-br from-amber-50 via-lime-50 to-emerald-50 text-slate-800 p-4 pt-32 space-y-6"
+      className="min-h-screen bg-gradient-to-br from-amber-50 via-lime-50 to-emerald-50 text-slate-800 p-4 space-y-6"
       onPaste={handlePaste}
       tabIndex={0}
       style={{
@@ -258,7 +258,7 @@ export default function App() {
       )}
 
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-md shadow-lg border-b-2 border-lime-200 p-4 z-50 mx-4 mt-4 rounded-2xl">
+      <header className="sticky top-0 bg-white/90 backdrop-blur-md shadow-xl border-b-4 border-lime-300 p-4 mb-6 rounded-2xl z-[100]">
         <div className="absolute inset-0 bg-gradient-to-r from-lime-100/20 to-emerald-100/20 rounded-2xl"></div>
         <div className="relative flex flex-wrap items-center gap-4">
           <div className="flex-1">
@@ -362,29 +362,31 @@ export default function App() {
 
       {/* Result Display */}
       {result && (
-        <>
-          {/* スコア専用大型表示 - 画面上部固定 */}
-          <div className="sticky top-28 z-40 mb-6">
-            <div className="relative bg-gradient-to-br from-lime-100 via-emerald-100 to-lime-100 p-8 rounded-3xl text-center border-4 border-lime-400 shadow-2xl animate-fade-in">
-              <div className="absolute inset-0 bg-gradient-to-br from-lime-200/30 to-emerald-200/30 rounded-3xl animate-pulse"></div>
-              <div className="relative">
-                <div className="text-xs text-slate-600 mb-2 font-bold uppercase tracking-widest">総合スコア</div>
-                <div className="flex items-center justify-center gap-6">
-                  <div className="relative">
-                    <div className="absolute inset-0 bg-gradient-to-r from-lime-400 to-emerald-400 blur-3xl opacity-50"></div>
-                    <div className="relative text-8xl md:text-9xl font-black bg-gradient-to-r from-lime-600 via-emerald-600 to-lime-600 bg-clip-text text-transparent drop-shadow-2xl">{result.score}</div>
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <div className="text-5xl md:text-6xl font-black text-yellow-500 drop-shadow-lg">{result.rank}</div>
-                    <div className="text-xs text-slate-600 font-semibold mt-1">ランク</div>
-                  </div>
+        <div className="relative rounded-2xl border-4 border-lime-300 bg-white/70 backdrop-blur-md p-8 space-y-6 shadow-2xl overflow-hidden animate-fade-in z-10">
+          <div className="absolute inset-0 bg-gradient-to-br from-lime-50/50 to-emerald-50/50"></div>
+          
+          <div className="relative flex items-center justify-between border-b-2 border-lime-200 pb-4">
+            <h2 className="text-2xl font-bold text-slate-800">{result.name}</h2>
+            <span className="text-lg px-4 py-2 bg-gradient-to-r from-lime-500 to-emerald-500 text-white rounded-xl font-bold shadow-lg">COST {result.cost}</span>
+          </div>
+          
+          {/* スコア - 大きく表示 */}
+          <div className="relative bg-gradient-to-br from-lime-100 via-emerald-100 to-lime-100 p-12 rounded-3xl text-center border-4 border-lime-400 shadow-2xl">
+            <div className="absolute inset-0 bg-gradient-to-br from-lime-200/30 to-emerald-200/30 rounded-3xl animate-pulse"></div>
+            <div className="relative">
+              <div className="text-sm text-slate-600 mb-4 font-bold uppercase tracking-widest">総合スコア</div>
+              <div className="flex items-center justify-center gap-8">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-gradient-to-r from-lime-400 to-emerald-400 blur-2xl opacity-50"></div>
+                  <div className="relative text-9xl font-black bg-gradient-to-r from-lime-600 via-emerald-600 to-lime-600 bg-clip-text text-transparent drop-shadow-2xl">{result.score}</div>
+                </div>
+                <div className="flex flex-col items-center">
+                  <div className="text-6xl font-black text-yellow-500 drop-shadow-lg">{result.rank}</div>
+                  <div className="text-sm text-slate-600 font-semibold mt-2">ランク</div>
                 </div>
               </div>
             </div>
           </div>
-          
-          {/* 詳細情報 */}
-          <div className="relative rounded-2xl border-4 border-lime-300 bg-white/70 backdrop-blur-md p-8 space-y-6 shadow-2xl overflow-hidden z-30">
           <div className="absolute inset-0 bg-gradient-to-br from-lime-50/50 to-emerald-50/50"></div>
           
           <div className="relative flex items-center justify-between border-b-2 border-lime-200 pb-4">
@@ -432,7 +434,6 @@ export default function App() {
             )}
           </div>
         </div>
-        </>
       )}
 
       {/* 認識領域の表示 */}
