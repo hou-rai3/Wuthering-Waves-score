@@ -113,22 +113,29 @@ export type ScoreDetail = {
 };
 
 /**
- * スコア計算（詳細情報付き）
- * @param main1 メインステータス1行目（ステータス名と%）
- * @param main2 メインステータス2行目（実数値 - 計算に含めない）
- * @param subs サブステータス配列
+ * スコア計算（詳細情報付き、OCR認識結果の%値を直接使用）
+ * @param statTexts ステータスの完全テキスト配列（ステータス名と%）
+ * @param percentages OCRで認識した%値の配列（直接利用）
+ * @param characterName キャラクター名
  */
-export function calculateScoreWithBreakdown(main1: string, _main2: string, subs: string[], characterName?: string): ScoreDetail {
+export function calculateScoreWithBreakdown(
+  statTexts: string[],
+  percentages: number[],
+  characterName?: string
+): ScoreDetail {
   let score = 0;
   const breakdown: ScoreDetail['breakdown'] = [];
-  
-  // メインステータスのスコア（1行目のみ、%のみを使用）
-  const main1Cleaned = cleanText(main1);
-  const main1Percentage = extractPercentage(main1Cleaned);
-  const main1StatName = normalizeStatName(main1Cleaned);
+
+  if (statTexts.length === 0 || percentages.length === 0) {
+    return { score: 0, breakdown: [] };
+  }
+
+  // メインステータス（インデックス0）
+  const main1StatName = normalizeStatName(statTexts[0]);
+  const main1Percentage = percentages[0];
   const main1Weight = getStatWeight(main1StatName, characterName);
   const main1Contribution = main1Percentage * main1Weight;
-  
+
   score += main1Contribution;
   breakdown.push({
     type: 'main1',
@@ -137,27 +144,25 @@ export function calculateScoreWithBreakdown(main1: string, _main2: string, subs:
     weight: main1Weight,
     contribution: Math.round(main1Contribution * 10) / 10,
   });
-  
-  // サブステータスのスコア（%のみを使用）
-  for (let i = 0; i < subs.length; i++) {
-    const sub = subs[i];
-    const subCleaned = cleanText(sub);
-    const subPercentage = extractPercentage(subCleaned);
-    const subStatName = normalizeStatName(subCleaned);
+
+  // サブステータス（インデックス1以降）
+  for (let i = 1; i < statTexts.length; i++) {
+    const subStatName = normalizeStatName(statTexts[i]);
+    const subPercentage = percentages[i];
     const subWeight = getStatWeight(subStatName, characterName);
     const subContribution = subPercentage * subWeight;
-    
+
     score += subContribution;
     breakdown.push({
       type: 'sub',
-      index: i + 1,
+      index: i,
       statName: subStatName,
       percentage: subPercentage,
       weight: subWeight,
       contribution: Math.round(subContribution * 10) / 10,
     });
   }
-  
+
   return {
     score: Math.round(score * 10) / 10,
     breakdown,
@@ -166,12 +171,12 @@ export function calculateScoreWithBreakdown(main1: string, _main2: string, subs:
 
 /**
  * スコア計算（従来の戻り値）
- * @param main1 メインステータス1行目（ステータス名と%）
- * @param main2 メインステータス2行目（実数値 - 計算に含めない）
- * @param subs サブステータス配列
+ * @param statTexts ステータスの完全テキスト配列
+ * @param percentages %値の配列
+ * @param characterName キャラクター名
  */
-export function calculateScore(main1: string, main2: string, subs: string[], characterName?: string): number {
-  return calculateScoreWithBreakdown(main1, main2, subs, characterName).score;
+export function calculateScore(statTexts: string[], percentages: number[], characterName?: string): number {
+  return calculateScoreWithBreakdown(statTexts, percentages, characterName).score;
 }
 
 /**

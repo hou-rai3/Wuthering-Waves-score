@@ -176,9 +176,20 @@ export default function App() {
       const cleanedMain2 = cleanText(main2Res.text);
       const cleanedSubs = rois.regions.subs.map((_, i) => cleanText(results[`sub${i + 1}`].text));
 
+      // OCR認識結果から%値を直接抽出
+      const allStatNames = [cleanedMain1, ...cleanedSubs];
+      const allPercentages = [
+        parseFloat(main1Res.text.match(/(\d+\.?\d*)/)?.[1] || '0'),
+        ...rois.regions.subs.map((_, i) => {
+          const text = results[`sub${i + 1}`].text;
+          const match = text.match(/(\d+\.?\d*)/);
+          return parseFloat(match?.[1] || '0');
+        }),
+      ];
+
       // スコア計算
       const characterName = cleanText(nameRes.text);
-      const scoreDetails = calculateScoreWithBreakdown(cleanedMain1, cleanedMain2, cleanedSubs, selectedCharacter);
+      const scoreDetails = calculateScoreWithBreakdown(allStatNames, allPercentages, selectedCharacter);
       const rank = getScoreRank(scoreDetails.score);
       
       setResult({
