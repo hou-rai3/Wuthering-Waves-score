@@ -280,36 +280,35 @@ export default function App() {
         </div>
       </header>
 
-      {/* Upload Area */}
-      <div
-        className="border-2 border-dashed border-slate-600 rounded-lg p-8 text-center hover:border-slate-500 transition"
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={(e) => {
-          e.preventDefault();
-          handleFiles(e.dataTransfer.files);
-        }}
-      >
-        <div className="space-y-2">
-          <p className="text-base font-medium">画像をドラッグ&ドロップ</p>
-          <p className="text-xs text-slate-400">または Ctrl+V でペースト</p>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => handleFiles(e.target.files)}
-            className="hidden"
-            id="file-input"
-          />
-          <label
-            htmlFor="file-input"
-            className="inline-block px-3 py-1 rounded bg-slate-800 border border-slate-700 hover:bg-slate-700 text-sm cursor-pointer"
-          >
-            ファイルを選択
-          </label>
+      {/* Upload Area or Image Preview */}
+      {!imgUrl ? (
+        <div
+          className="border-2 border-dashed border-slate-600 rounded-lg p-8 text-center hover:border-slate-500 transition"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            handleFiles(e.dataTransfer.files);
+          }}
+        >
+          <div className="space-y-2">
+            <p className="text-base font-medium">画像をドラッグ&ドロップ</p>
+            <p className="text-xs text-slate-400">または Ctrl+V でペースト</p>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => handleFiles(e.target.files)}
+              className="hidden"
+              id="file-input"
+            />
+            <label
+              htmlFor="file-input"
+              className="inline-block px-3 py-1 rounded bg-slate-800 border border-slate-700 hover:bg-slate-700 text-sm cursor-pointer"
+            >
+              ファイルを選択
+            </label>
+          </div>
         </div>
-      </div>
-
-      {/* Image Preview */}
-      {imgUrl && (
+      ) : (
         <div className="rounded border border-slate-700 bg-slate-900 p-4 flex justify-center items-center h-80 overflow-hidden">
           <img 
             src={imgUrl} 
