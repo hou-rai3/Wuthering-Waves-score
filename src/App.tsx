@@ -421,7 +421,14 @@ export default function App() {
               <div className="space-y-3">
                 <div className="bg-lime-50 p-4 rounded-lg border-2 border-lime-300 hover:border-lime-400 transition-all shadow-md">
                   <div className="text-xs text-slate-600 font-bold mb-2">ステータス1</div>
-                  <div className="text-lg font-bold text-lime-700 font-mono">{result.main1}</div>
+                  <div className="flex items-baseline justify-between">
+                    <div className="text-base font-bold text-lime-700">{result.main1}</div>
+                    {result.scoreDetails?.breakdown[0] && (
+                      <div className="text-xl font-black text-lime-800 font-mono">
+                        {result.scoreDetails.breakdown[0].percentage}%
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="bg-lime-50 p-4 rounded-lg border-2 border-lime-300 hover:border-lime-400 transition-all shadow-md">
                   <div className="text-xs text-slate-600 font-bold mb-2">ステータス2</div>
@@ -438,14 +445,24 @@ export default function App() {
                   <h3 className="text-lg font-black text-lime-800">サブステータス</h3>
                 </div>
                 <div className="space-y-2">
-                  {result.subs.map((sub, i) => (
-                    <div key={i} className="bg-lime-50 p-3 rounded-lg border-2 border-lime-300 hover:border-lime-400 transition-all shadow-md">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-slate-600 font-bold">Sub {i + 1}</span>
-                        <span className="font-mono font-bold text-green-700">{sub}</span>
+                  {result.subs.map((sub, i) => {
+                    const breakdownItem = result.scoreDetails?.breakdown[i + 1];
+                    return (
+                      <div key={i} className="bg-lime-50 p-3 rounded-lg border-2 border-lime-300 hover:border-lime-400 transition-all shadow-md">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex-1">
+                            <span className="text-xs text-slate-600 font-bold block">Sub {i + 1}</span>
+                            <span className="font-mono font-semibold text-green-700 text-sm">{sub}</span>
+                          </div>
+                          {breakdownItem && (
+                            <span className="text-lg font-black text-lime-800 font-mono">
+                              {breakdownItem.percentage}%
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
