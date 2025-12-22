@@ -41,15 +41,25 @@ export function extractPercentage(text: string): number {
 
 /**
  * ステータス名を正規化
+ * @param text OCRで取得したテキスト
+ * @param fullText 元のテキスト全体（%判定用）
  */
-export function normalizeStatName(text: string): string {
+export function normalizeStatName(text: string, fullText?: string): string {
   const cleaned = cleanText(text);
   
   // 数値部分を削除してステータス名だけを取得
   let statName = cleaned.replace(/[\d.]+%?/g, '').trim();
   
-  // 末尾の余計な記号を削除（ハイフン、スペース、括弧など）
-  statName = statName.replace(/[-\s()（）]+$/g, '').trim();
+  // すべての記号を削除（比較用の正規化）
+  statName = statName.replace(/[-\s()（）_・]+/g, '').trim();
+  
+  // 実数値かどうかを判定（%記号がない場合）
+  const isAbsoluteValue = fullText && !/%/.test(fullText) && /\d/.test(fullText);
+  
+  // 攻撃力の場合、実数値なら明示的に識別
+  if (statName.includes('攻撃') && isAbsoluteValue) {
+    return '攻撃力(実数値)';
+  }
   
   return statName;
 }
@@ -69,6 +79,7 @@ const CHARACTER_WEIGHTS: Record<string, Record<string, number>> = {
     'クリティカル': 2.0,              // 9.9% * 2.0 = 19.8
     'クリティカルダメージ': 1.0,      // 15.0% * 1.0 = 15
     '攻撃力': 1.25,                   // 9.4% * 1.25 = 11.75（%表記）
+    '攻撃力(実数値)': 0.0,            // 実数値は評価外
     '共鳴スキルダメージアップ': 1.0,  // 7.1% * 1.0 = 7.1
     '共鳴解放ダメージアップ': 0.0,    // 評価外 (スコア 0)
     '共鳴効率': 0.4,                  // 星2評価に基づき設定
@@ -120,12 +131,16 @@ function getStatWeight(statName: string, characterName?: string): number {
       return table[statName];
     }
     
+    // 正規化して比較（記号を削除）
+    const normalizedStatName = statName.replace(/[-\s()（）_・]+/g, '');
+    
     // 編集距離で最も近いキーを見つける
     let bestMatch = keys[0];
-    let bestDistance = calculateEditDistance(statName, keys[0]);
+    let bestDistance = calculateEditDistance(normalizedStatName, keys[0].replace(/[-\s()（）_・]+/g, ''));
     
     for (let i = 1; i < keys.length; i++) {
-      const distance = calculateEditDistance(statName, keys[i]);
+      const normalizedKey = keys[i].replace(/[-\s()（）_・]+/g, '');
+      const distance = calculateEditDistance(normalizedStatName, normalizedKey);
       console.log(`[getStatWeight] "${keys[i]}" との距離: ${distance}`);
       if (distance < bestDistance) {
         bestDistance = distance;
@@ -177,7 +192,7 @@ export function calculateScoreWithBreakdown(
   }
 
   // メインステータス（インデックス0）
-  const main1StatName = normalizeStatName(statTexts[0]);
+  const main1StatName = normalizeStatName(statTexts[0], statTexts[0]);
   const main1Percentage = percentages[0];
   const main1Weight = getStatWeight(main1StatName, characterName);
   const main1Contribution = main1Percentage * main1Weight;
@@ -193,7 +208,7 @@ export function calculateScoreWithBreakdown(
 
   // サブステータス（インデックス1以降）
   for (let i = 1; i < statTexts.length; i++) {
-    const subStatName = normalizeStatName(statTexts[i]);
+    const subStatName = normalizeStatName(statTexts[i], statTexts[i]);
     const subPercentage = percentages[i];
     const subWeight = getStatWeight(subStatName, characterName);
     const subContribution = subPercentage * subWeight;
