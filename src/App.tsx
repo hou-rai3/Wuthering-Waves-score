@@ -175,11 +175,12 @@ export default function App() {
       const cleanedSubs = rois.regions.subs.map((_, i) => cleanText(results[`sub${i + 1}`].text));
 
       // スコア計算
-      const score = calculateScore(cleanedMain1, cleanedMain2, cleanedSubs);
+      const characterName = cleanText(nameRes.text);
+      const score = calculateScore(cleanedMain1, cleanedMain2, cleanedSubs, characterName);
       const rank = getScoreRank(score);
       
       setResult({
-        name: cleanText(nameRes.text),
+        name: characterName,
         cost: extractNumber(costRes.text),
         main1: cleanedMain1,
         main2: cleanedMain2,

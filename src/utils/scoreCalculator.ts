@@ -40,28 +40,59 @@ export function normalizeStatName(text: string): string {
 }
 
 /**
- * スコア計算の重み
+ * ベースの重み（キャラクター指定がない場合の既定値）
  */
-const STAT_WEIGHTS: Record<string, number> = {
+const BASE_WEIGHTS: Record<string, number> = {
   'クリティカル': 2.0,
   'クリティカルダメージ': 2.0,
   '共鳴スキルダメージアップ': 1.5,
   '共鳴解放ダメージアップ': 1.5,
   '攻撃力': 1.5,
+  '凝縮ダメージアップ': 1.0,
+  '通常攻撃ダメージアップ': 1.0,
   // デフォルトの重み
   'default': 1.0,
 };
 
 /**
+ * キャラクター別の重み設定
+ * 画像の星評価を数値化したもの（カルロッタ参照）。
+ * 参考スクリーンショットの個体で総合スコア≈69になるよう調整。
+ */
+const CHARACTER_WEIGHTS: Record<string, Record<string, number>> = {
+  // カルロッタ（凝縮ダメージ主体）
+  'カルロッタ': {
+    '凝縮ダメージアップ': 0.9,
+    'クリティカルダメージ': 1.3,
+    'クリティカル': 1.0,
+    '攻撃力': 0.6,
+    '共鳴解放ダメージアップ': 0.45,
+    '共鳴スキルダメージアップ': 0.45,
+    '通常攻撃ダメージアップ': 0.3,
+  },
+};
+
+/**
  * ステータス名から重みを取得
  */
-function getStatWeight(statName: string): number {
-  for (const [key, weight] of Object.entries(STAT_WEIGHTS)) {
+function getStatWeight(statName: string, characterName?: string): number {
+  // キャラクター別の重みがあれば優先
+  if (characterName && CHARACTER_WEIGHTS[characterName]) {
+    const table = CHARACTER_WEIGHTS[characterName];
+    for (const [key, weight] of Object.entries(table)) {
+      if (statName.includes(key)) {
+        return weight;
+      }
+    }
+  }
+
+  // 既定の重みにフォールバック
+  for (const [key, weight] of Object.entries(BASE_WEIGHTS)) {
     if (statName.includes(key)) {
       return weight;
     }
   }
-  return STAT_WEIGHTS.default;
+  return BASE_WEIGHTS.default;
 }
 
 /**
@@ -70,14 +101,14 @@ function getStatWeight(statName: string): number {
  * @param main2 メインステータス2行目（実数値 - 計算に含めない）
  * @param subs サブステータス配列
  */
-export function calculateScore(main1: string, _main2: string, subs: string[]): number {
+export function calculateScore(main1: string, _main2: string, subs: string[], characterName?: string): number {
   let score = 0;
   
   // メインステータスのスコア（1行目のみ、%のみを使用）
   const main1Cleaned = cleanText(main1);
   const main1Percentage = extractPercentage(main1Cleaned);
   const main1StatName = normalizeStatName(main1Cleaned);
-  const main1Weight = getStatWeight(main1StatName);
+  const main1Weight = getStatWeight(main1StatName, characterName);
   
   score += main1Percentage * main1Weight;
   
@@ -86,7 +117,7 @@ export function calculateScore(main1: string, _main2: string, subs: string[]): n
     const subCleaned = cleanText(sub);
     const subPercentage = extractPercentage(subCleaned);
     const subStatName = normalizeStatName(subCleaned);
-    const subWeight = getStatWeight(subStatName);
+    const subWeight = getStatWeight(subStatName, characterName);
     
     score += subPercentage * subWeight;
   }
