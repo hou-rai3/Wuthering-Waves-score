@@ -240,7 +240,7 @@ export default function App() {
       {/* Toast */}
       {toast && (
         <div
-          className={`fixed top-4 right-4 px-4 py-2 rounded shadow-lg z-50 ${
+          className={`fixed top-4 right-4 px-4 py-2 rounded shadow-lg ${
             toast.type === 'error'
               ? 'bg-red-600'
               : 'bg-emerald-600'
@@ -351,30 +351,6 @@ export default function App() {
             <div className="flex items-center justify-center gap-4">
               <div className="text-6xl font-bold text-emerald-400">{result.score}</div>
               <div className="text-3xl font-bold text-yellow-400">{result.rank}</div>
-            </div>
-          </div>
-          <div className="absolute inset-0 bg-gradient-to-br from-lime-50/50 to-emerald-50/50"></div>
-          
-          <div className="relative flex items-center justify-between border-b-2 border-lime-200 pb-4">
-            <h2 className="text-2xl font-bold text-slate-800">{result.name}</h2>
-            <span className="text-lg px-4 py-2 bg-gradient-to-r from-lime-500 to-emerald-500 text-white rounded-xl font-bold shadow-lg">COST {result.cost}</span>
-          </div>
-          
-          {/* スコア - より大きく強調表示 */}
-          <div className="relative bg-gradient-to-br from-lime-100 via-emerald-100 to-lime-100 p-12 rounded-3xl text-center border-4 border-lime-400 shadow-2xl">
-            <div className="absolute inset-0 bg-gradient-to-br from-lime-200/30 to-emerald-200/30 rounded-3xl animate-pulse"></div>
-            <div className="relative">
-              <div className="text-sm text-slate-600 mb-4 font-bold uppercase tracking-widest">総合スコア</div>
-              <div className="flex items-center justify-center gap-8">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-r from-lime-400 to-emerald-400 blur-2xl opacity-50"></div>
-                  <div className="relative text-9xl font-black bg-gradient-to-r from-lime-600 via-emerald-600 to-lime-600 bg-clip-text text-transparent drop-shadow-2xl">{result.score}</div>
-                </div>
-                <div className="flex flex-col items-center">
-                  <div className="text-6xl font-black text-yellow-500 drop-shadow-lg">{result.rank}</div>
-                  <div className="text-sm text-slate-600 font-semibold mt-2">ランク</div>
-                </div>
-              </div>
             </div>
           </div>
           
