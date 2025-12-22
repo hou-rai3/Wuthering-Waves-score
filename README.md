@@ -1,3 +1,5 @@
+https://hou-rai3.github.io/Wuthering-Waves-score/
+
 # Echo OCR Scorer
 
 Wuthering Waves のゲーム画面から「音骸（Echo）」のステータスを自動読み込みし、スコアを算出する Web アプリケーション。
