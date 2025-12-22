@@ -46,7 +46,10 @@ export function normalizeStatName(text: string): string {
   const cleaned = cleanText(text);
   
   // 数値部分を削除してステータス名だけを取得
-  const statName = cleaned.replace(/[\d.]+%?/g, '').trim();
+  let statName = cleaned.replace(/[\d.]+%?/g, '').trim();
+  
+  // 末尾の余計な記号を削除（ハイフン、スペース、括弧など）
+  statName = statName.replace(/[-\s()（）]+$/g, '').trim();
   
   return statName;
 }
@@ -78,7 +81,33 @@ const CHARACTER_WEIGHTS: Record<string, Record<string, number>> = {
 };
 
 /**
- * ステータス名から重みを取得
+ * 編集距離（Levenshtein距離）を計算
+ */
+function calculateEditDistance(str1: string, str2: string): number {
+  const len1 = str1.length;
+  const len2 = str2.length;
+  const dp: number[][] = Array(len1 + 1)
+    .fill(null)
+    .map(() => Array(len2 + 1).fill(0));
+
+  for (let i = 0; i <= len1; i++) dp[i][0] = i;
+  for (let j = 0; j <= len2; j++) dp[0][j] = j;
+
+  for (let i = 1; i <= len1; i++) {
+    for (let j = 1; j <= len2; j++) {
+      if (str1[i - 1] === str2[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1];
+      } else {
+        dp[i][j] = 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+      }
+    }
+  }
+
+  return dp[len1][len2];
+}
+
+/**
+ * ステータス名から重みを取得（ファジーマッチング使用）
  */
 function getStatWeight(statName: string, characterName?: string): number {
   console.log('[getStatWeight] statName:', statName, 'characterName:', characterName);
@@ -86,22 +115,30 @@ function getStatWeight(statName: string, characterName?: string): number {
   // キャラクター別の重みを使用
   if (characterName && CHARACTER_WEIGHTS[characterName]) {
     const table = CHARACTER_WEIGHTS[characterName];
-    console.log('[getStatWeight] テーブルが見つかりました:', Object.keys(table));
+    const keys = Object.keys(table);
+    console.log('[getStatWeight] テーブルが見つかりました:', keys);
     
-    // より具体的なキーから順にチェック（長い方から先にマッチング）
-    const sortedKeys = Object.keys(table).sort((a, b) => b.length - a.length);
+    // 完全一致を最優先でチェック
+    if (statName in table) {
+      console.log('[getStatWeight] 完全一致:', statName, '-> weight:', table[statName]);
+      return table[statName];
+    }
     
-    for (const key of sortedKeys) {
-      // キー文字列が含まれているかチェック（括弧などの特殊な部分も考慮）
-      const normalizedKey = key.replace(/[()（）]/g, '');
-      const normalizedStat = statName.replace(/[()（）]/g, '');
-      
-      if (normalizedStat.includes(normalizedKey) || statName.includes(key)) {
-        console.log('[getStatWeight] マッチしました:', key, '-> weight:', table[key]);
-        return table[key];
+    // 編集距離で最も近いキーを見つける
+    let bestMatch = keys[0];
+    let bestDistance = calculateEditDistance(statName, keys[0]);
+    
+    for (let i = 1; i < keys.length; i++) {
+      const distance = calculateEditDistance(statName, keys[i]);
+      console.log(`[getStatWeight] "${keys[i]}" との距離: ${distance}`);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestMatch = keys[i];
       }
     }
-    console.log('[getStatWeight] マッチなし、デフォルト値を返します');
+    
+    console.log('[getStatWeight] 最も近い一致:', bestMatch, '(距離:', bestDistance, ') -> weight:', table[bestMatch]);
+    return table[bestMatch];
   } else {
     console.log('[getStatWeight] キャラクターテーブルが見つかりません');
   }
