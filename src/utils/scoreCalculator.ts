@@ -52,21 +52,6 @@ export function normalizeStatName(text: string): string {
 }
 
 /**
- * ベースの重み（キャラクター指定がない場合の既定値）
- */
-const BASE_WEIGHTS: Record<string, number> = {
-  'クリティカル': 2.0,
-  'クリティカルダメージ': 2.0,
-  '共鳴スキルダメージアップ': 1.5,
-  '共鳴解放ダメージアップ': 1.5,
-  '攻撃力': 1.5,
-  '凝縮ダメージアップ': 1.0,
-  '通常攻撃ダメージアップ': 1.0,
-  // デフォルトの重み
-  'default': 1.0,
-};
-
-/**
  * キャラクター別の重み設定
  * ゲーム内の公式計算を完全に再現
  * 参考個体で正確に69になるよう調整
@@ -93,7 +78,7 @@ const CHARACTER_WEIGHTS: Record<string, Record<string, number>> = {
  * ステータス名から重みを取得
  */
 function getStatWeight(statName: string, characterName?: string): number {
-  // キャラクター別の重みがあれば優先
+  // キャラクター別の重みを使用
   if (characterName && CHARACTER_WEIGHTS[characterName]) {
     const table = CHARACTER_WEIGHTS[characterName];
     for (const [key, weight] of Object.entries(table)) {
@@ -103,13 +88,8 @@ function getStatWeight(statName: string, characterName?: string): number {
     }
   }
 
-  // 既定の重みにフォールバック
-  for (const [key, weight] of Object.entries(BASE_WEIGHTS)) {
-    if (statName.includes(key)) {
-      return weight;
-    }
-  }
-  return BASE_WEIGHTS.default;
+  // キャラクター指定なしまたは該当なしの場合はデフォルト値
+  return 1.0;
 }
 
 /**
