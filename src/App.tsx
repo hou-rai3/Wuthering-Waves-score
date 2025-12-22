@@ -233,24 +233,17 @@ export default function App() {
 
   return (
     <div
-      className="min-h-screen bg-gradient-to-br from-amber-50 via-lime-50 to-emerald-50 text-slate-800 p-4 space-y-6"
+      className="min-h-screen bg-slate-950 text-slate-100 p-4 space-y-4"
       onPaste={handlePaste}
       tabIndex={0}
-      style={{
-        backgroundImage: `
-          linear-gradient(to right, rgba(132, 204, 22, 0.05) 1px, transparent 1px),
-          linear-gradient(to bottom, rgba(132, 204, 22, 0.05) 1px, transparent 1px)
-        `,
-        backgroundSize: '40px 40px'
-      }}
     >
       {/* Toast */}
       {toast && (
         <div
-          className={`fixed top-4 right-4 px-6 py-3 rounded-lg shadow-2xl backdrop-blur-sm border-2 animate-slide-in ${
+          className={`fixed top-4 right-4 px-4 py-2 rounded shadow-lg z-50 ${
             toast.type === 'error'
-              ? 'bg-red-100/90 border-red-400 text-red-800'
-              : 'bg-lime-100/90 border-lime-400 text-lime-900'
+              ? 'bg-red-600'
+              : 'bg-emerald-600'
           }`}
         >
           {toast.message}
@@ -258,61 +251,48 @@ export default function App() {
       )}
 
       {/* Header */}
-      <header className="sticky top-0 bg-white/90 backdrop-blur-md shadow-xl border-b-4 border-lime-300 p-4 mb-6 rounded-2xl z-[100]">
-        <div className="absolute inset-0 bg-gradient-to-r from-lime-100/20 to-emerald-100/20 rounded-2xl"></div>
-        <div className="relative flex flex-wrap items-center gap-4">
-          <div className="flex-1">
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-lime-600 to-emerald-600 bg-clip-text text-transparent">
-              鳴潮 自動スコア計算器
-            </h1>
-            <p className="text-sm text-slate-600 mt-1">音骸ステータス解析</p>
-          </div>
-          
-          <div className="flex gap-3 items-center">
-            <select
-              value={selectedCharacter}
-              onChange={(e) => setSelectedCharacter(e.target.value)}
-              className="px-4 py-2 rounded-xl bg-white border-2 border-lime-300 hover:border-lime-400 text-slate-800 font-medium shadow-sm transition-all"
-            >
-              <option value="カルロッタ">カルロッタ</option>
-              <option value="デフォルト">デフォルト</option>
-            </select>
-            <button
-              onClick={() => setDebug((v) => !v)}
-              className="px-4 py-2 rounded-xl bg-white border-2 border-slate-300 hover:border-slate-400 text-slate-700 font-medium shadow-sm transition-all"
-            >
-              {debug ? 'デバッグOFF' : 'デバッグON'}
-            </button>
-            <button
-              disabled={!ready || !rois || loading}
-              onClick={runOcr}
-              className="px-6 py-2 rounded-xl bg-gradient-to-r from-lime-500 to-emerald-500 hover:from-lime-600 hover:to-emerald-600 disabled:from-slate-300 disabled:to-slate-400 disabled:cursor-not-allowed text-white font-bold shadow-lg transition-all transform hover:scale-105"
-            >
-              {loading ? '読込中...' : 'OCR実行'}
-            </button>
-          </div>
+      <header className="flex flex-wrap items-center gap-2 mb-6">
+        <h1 className="text-2xl font-bold">鳴潮 自動スコア計算器</h1>
+        <span className="text-xs text-slate-400">音骸ステータス解析</span>
+
+        <div className="flex gap-2 ml-auto">
+          <select
+            value={selectedCharacter}
+            onChange={(e) => setSelectedCharacter(e.target.value)}
+            className="px-3 py-1 rounded bg-slate-800 border border-slate-700 hover:bg-slate-700 text-sm"
+          >
+            <option value="カルロッタ">カルロッタ</option>
+            <option value="デフォルト">デフォルト</option>
+          </select>
+          <button
+            onClick={() => setDebug((v) => !v)}
+            className="px-3 py-1 rounded bg-slate-800 border border-slate-700 hover:bg-slate-700 text-sm"
+          >
+            {debug ? 'デバッグOFF' : 'デバッグON'}
+          </button>
+          <button
+            disabled={!ready || !rois || loading}
+            onClick={runOcr}
+            className="px-3 py-1 rounded bg-emerald-600 disabled:bg-slate-700 disabled:cursor-not-allowed text-sm hover:bg-emerald-500"
+          >
+            {loading ? '読込中...' : 'OCR実行'}
+          </button>
         </div>
       </header>
 
       {/* Upload Area or Image Preview */}
       {!imgUrl ? (
         <div
-          className="relative border-4 border-dashed border-lime-300 rounded-2xl p-12 text-center hover:border-lime-400 transition-all bg-white/40 backdrop-blur-sm shadow-lg overflow-hidden group"
+          className="border-2 border-dashed border-slate-600 rounded-lg p-8 text-center hover:border-slate-500 transition"
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault();
             handleFiles(e.dataTransfer.files);
           }}
         >
-          <div className="absolute inset-0 bg-gradient-to-br from-lime-100/30 to-emerald-100/30 group-hover:from-lime-200/40 group-hover:to-emerald-200/40 transition-all"></div>
-          <div className="relative space-y-4">
-            <div className="inline-block p-4 bg-lime-100 rounded-full mb-2">
-              <svg className="w-12 h-12 text-lime-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <p className="text-xl font-bold text-slate-700">画像をドラッグ&ドロップ</p>
-            <p className="text-sm text-slate-500">または Ctrl+V でペースト</p>
+          <div className="space-y-2">
+            <p className="text-base font-medium">画像をドラッグ&ドロップ</p>
+            <p className="text-xs text-slate-400">または Ctrl+V でペースト</p>
             <input
               type="file"
               accept="image/*"
@@ -322,22 +302,19 @@ export default function App() {
             />
             <label
               htmlFor="file-input"
-              className="inline-block px-6 py-3 rounded-xl bg-gradient-to-r from-lime-500 to-emerald-500 hover:from-lime-600 hover:to-emerald-600 text-white font-bold cursor-pointer shadow-lg transition-all transform hover:scale-105"
+              className="inline-block px-3 py-1 rounded bg-slate-800 border border-slate-700 hover:bg-slate-700 text-sm cursor-pointer"
             >
               ファイルを選択
             </label>
           </div>
         </div>
       ) : (
-        <div className="relative rounded-2xl border-4 border-lime-300 bg-white/60 backdrop-blur-sm p-6 shadow-xl overflow-hidden z-10">
-          <div className="absolute inset-0 bg-gradient-to-br from-lime-50/50 to-emerald-50/50"></div>
-          <div className="relative h-80 flex justify-center items-center">
-            <img 
-              src={imgUrl} 
-              alt="Preview" 
-              className="w-full h-full object-contain rounded-lg"
-            />
-          </div>
+        <div className="rounded border border-slate-700 bg-slate-900 p-4 flex justify-center items-center h-80 overflow-hidden">
+          <img 
+            src={imgUrl} 
+            alt="Preview" 
+            className="w-full h-full object-contain"
+          />
         </div>
       )}
 
@@ -362,29 +339,18 @@ export default function App() {
 
       {/* Result Display */}
       {result && (
-        <div className="relative rounded-2xl border-4 border-lime-300 bg-white/70 backdrop-blur-md p-8 space-y-6 shadow-2xl overflow-hidden animate-fade-in z-10">
-          <div className="absolute inset-0 bg-gradient-to-br from-lime-50/50 to-emerald-50/50"></div>
-          
-          <div className="relative flex items-center justify-between border-b-2 border-lime-200 pb-4">
-            <h2 className="text-2xl font-bold text-slate-800">{result.name}</h2>
-            <span className="text-lg px-4 py-2 bg-gradient-to-r from-lime-500 to-emerald-500 text-white rounded-xl font-bold shadow-lg">COST {result.cost}</span>
+        <div className="rounded border-2 border-emerald-500 bg-slate-900 p-6 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-700 pb-3">
+            <h2 className="text-xl font-semibold">{result.name}</h2>
+            <span className="text-base px-3 py-1 bg-slate-800 rounded font-semibold">COST {result.cost}</span>
           </div>
           
           {/* スコア - 大きく表示 */}
-          <div className="relative bg-gradient-to-br from-lime-100 via-emerald-100 to-lime-100 p-12 rounded-3xl text-center border-4 border-lime-400 shadow-2xl">
-            <div className="absolute inset-0 bg-gradient-to-br from-lime-200/30 to-emerald-200/30 rounded-3xl animate-pulse"></div>
-            <div className="relative">
-              <div className="text-sm text-slate-600 mb-4 font-bold uppercase tracking-widest">総合スコア</div>
-              <div className="flex items-center justify-center gap-8">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-r from-lime-400 to-emerald-400 blur-2xl opacity-50"></div>
-                  <div className="relative text-9xl font-black bg-gradient-to-r from-lime-600 via-emerald-600 to-lime-600 bg-clip-text text-transparent drop-shadow-2xl">{result.score}</div>
-                </div>
-                <div className="flex flex-col items-center">
-                  <div className="text-6xl font-black text-yellow-500 drop-shadow-lg">{result.rank}</div>
-                  <div className="text-sm text-slate-600 font-semibold mt-2">ランク</div>
-                </div>
-              </div>
+          <div className="bg-gradient-to-r from-emerald-900 to-slate-900 p-6 rounded-lg text-center">
+            <div className="text-sm text-slate-400 mb-2">総合スコア</div>
+            <div className="flex items-center justify-center gap-4">
+              <div className="text-6xl font-bold text-emerald-400">{result.score}</div>
+              <div className="text-3xl font-bold text-yellow-400">{result.rank}</div>
             </div>
           </div>
           <div className="absolute inset-0 bg-gradient-to-br from-lime-50/50 to-emerald-50/50"></div>
@@ -412,21 +378,20 @@ export default function App() {
             </div>
           </div>
           
-          <div className="relative space-y-4">
-            <div className="bg-white/80 backdrop-blur-sm p-5 rounded-xl border-2 border-lime-200 shadow-md">
-              <div className="text-xs text-slate-600 mb-3 font-bold uppercase tracking-wider">メインステータス</div>
-              <div className="text-lg font-bold text-slate-800">{result.main1}</div>
-              <div className="text-sm font-mono text-slate-600 mt-1">{result.main2}</div>
+          <div className="space-y-3">
+            <div className="bg-slate-800 p-3 rounded">
+              <div className="text-xs text-slate-400 mb-2">メインステータス</div>
+              <div className="text-base font-mono">{result.main1}</div>
+              <div className="text-sm font-mono text-slate-500">{result.main2}</div>
             </div>
             
             {result.subs.length > 0 && (
-              <div className="bg-white/80 backdrop-blur-sm p-5 rounded-xl border-2 border-lime-200 shadow-md">
-                <div className="text-xs text-slate-600 mb-3 font-bold uppercase tracking-wider">サブステータス</div>
-                <div className="space-y-2">
+              <div className="bg-slate-800 p-3 rounded">
+                <div className="text-xs text-slate-400 mb-2">サブステータス</div>
+                <div className="space-y-1">
                   {result.subs.map((sub, i) => (
-                    <div key={i} className="text-base font-semibold text-slate-700 flex items-center gap-2">
-                      <span className="flex items-center justify-center w-6 h-6 rounded-full bg-lime-500 text-white text-xs font-bold">{i + 1}</span>
-                      {sub}
+                    <div key={i} className="text-base font-mono">
+                      {i + 1}. {sub}
                     </div>
                   ))}
                 </div>
