@@ -327,9 +327,9 @@ export default function App() {
           </div>
         </div>
       ) : (
-        <div className="relative z-10 grid grid-cols-3 gap-4 h-96">
+        <div className="relative z-10 grid grid-cols-3 gap-4 items-start">
           {/* Left: Image */}
-          <div className="card-styled p-3 border-2 border-lime-400 shadow-xl col-span-1 overflow-hidden">
+          <div className="card-styled p-3 border-2 border-lime-400 shadow-xl col-span-1 overflow-hidden h-[420px]">
             <img 
               src={imgUrl} 
               alt="Preview" 
@@ -341,7 +341,7 @@ export default function App() {
           {result ? (
             <div className="col-span-2 space-y-3">
               {/* Character & Score Summary */}
-              <div className="card-styled p-4 border-2 border-lime-400 shadow-xl h-1/2">
+              <div className="card-styled p-4 border-2 border-lime-400 shadow-xl">
                 <div className="flex items-center justify-between mb-2">
                   <div>
                     <h2 className="text-xl font-black text-lime-800" style={{ fontFamily: "'Playfair Display', serif" }}>
@@ -361,7 +361,7 @@ export default function App() {
               </div>
 
               {/* Stats Compact */}
-              <div className="card-styled p-3 border-2 border-lime-400 shadow-xl h-1/2 overflow-y-auto">
+              <div className="card-styled p-3 border-2 border-lime-400 shadow-xl">
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="bg-lime-50 p-2 rounded-2xl border-2 border-lime-300">
                     <div className="font-bold text-lime-800">{result.main1}</div>
