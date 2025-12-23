@@ -30,6 +30,7 @@ export default function App() {
   const [ocrResults, setOcrResults] = useState<Record<string, { text: string; confidence: number }>>({});
   const [selectedCharacter, setSelectedCharacter] = useState<string>('カルロッタ');
   const [imgUrl, setImgUrl] = useState<string | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
 
   const { recognize, ready, loading, error: ocrError } = useOcr();
 
@@ -252,72 +253,62 @@ export default function App() {
         </div>
       )}
 
-      {/* Header */}
-      <header className="relative z-10 space-y-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-          <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <div className="w-1 h-12 bg-gradient-to-b from-lime-500 to-green-600 rounded-full shadow-lg"></div>
-                <div className="absolute -inset-1 bg-gradient-to-b from-lime-400 to-green-500 rounded-full opacity-20 blur"></div>
-              </div>
-              <div>
-                <h1 className="text-6xl md:text-7xl font-black text-lime-800" style={{ fontFamily: "'Playfair Display', serif", letterSpacing: '-0.02em' }}>鳴潮</h1>
-                <div className="h-0.5 w-24 bg-gradient-to-r from-lime-600 to-green-600 mt-2"></div>
-              </div>
+      {/* Header - Compact */}
+      <header className="relative z-10 space-y-2 mb-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <div className="w-1 h-6 bg-gradient-to-b from-lime-500 to-green-600 rounded-full shadow-lg"></div>
             </div>
-            <p className="text-lg md:text-xl text-slate-700 flex items-center gap-2 font-semibold ml-4">
-              <Sparkles size={20} className="text-lime-600" />
-              <span>音骸スコア自動計算ツール</span>
-            </p>
+            <div>
+              <h1 className="text-3xl font-black text-lime-800" style={{ fontFamily: "'Playfair Display', serif", letterSpacing: '-0.02em' }}>鳴潮</h1>
+            </div>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex items-center gap-2">
             <select
               value={selectedCharacter}
               onChange={(e) => setSelectedCharacter(e.target.value)}
-              className="px-5 py-3 rounded-lg bg-white border-2 border-lime-400 hover:border-lime-500 text-slate-800 text-sm font-bold transition-all shadow-md hover:shadow-lg"
+              className="px-3 py-1.5 rounded-lg bg-white border-2 border-lime-400 hover:border-lime-500 text-slate-800 text-xs font-bold transition-all shadow-md"
             >
               <option value="カルロッタ">カルロッタ</option>
               <option value="デフォルト">デフォルト</option>
             </select>
             <button
               onClick={() => setDebug((v) => !v)}
-              className={`px-5 py-3 rounded-lg text-sm font-bold transition-all shadow-md ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-md ${
                 debug
-                  ? 'bg-gradient-to-r from-purple-500 to-pink-500 border-2 border-purple-600 text-white hover:shadow-lg'
-                  : 'bg-white border-2 border-lime-400 text-lime-800 hover:border-lime-500 hover:bg-lime-50'
+                  ? 'bg-gradient-to-r from-purple-500 to-pink-500 border-2 border-purple-600 text-white'
+                  : 'bg-white border-2 border-lime-400 text-lime-800'
               }`}
             >
-              {debug ? '🔧 デバッグ' : '◎ デバッグ'}
+              {debug ? '🔧' : '◎'}
             </button>
           </div>
         </div>
-
-        {/* Decorative line */}
-        <div className="section-divider"></div>
+        <p className="text-xs text-slate-700 font-semibold ml-2">音骸スコア自動計算ツール</p>
       </header>
 
-      {/* Upload Area or Image Preview */}
+      {/* Upload Area or Image Preview - Compact */}
       {!imgUrl ? (
         <div
-          className="relative z-10 gradient-border p-8 md:p-12 text-center cursor-pointer hover:border-lime-500 transition-all group overflow-hidden"
+          className="relative z-10 gradient-border p-4 text-center cursor-pointer hover:border-lime-500 transition-all group overflow-hidden h-64 md:h-80 flex flex-col items-center justify-center"
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault();
             handleFiles(e.dataTransfer.files);
           }}
         >
-          <div className="absolute inset-0 bg-gradient-wave opacity-50 group-hover:opacity-100 transition-opacity"></div>
-          <div className="relative space-y-4">
-            <div className="flex justify-center mb-4">
-              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-lime-200 to-green-200 border-2 border-lime-400 flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg">
-                <Upload className="w-10 h-10 text-lime-700" />
+          <div className="absolute inset-0 bg-gradient-wave opacity-30 group-hover:opacity-50 transition-opacity"></div>
+          <div className="relative space-y-3 text-center">
+            <div className="flex justify-center mb-3">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-lime-200 to-green-200 border-2 border-lime-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Upload className="w-6 h-6 text-lime-700" />
               </div>
             </div>
             <div>
-              <p className="text-lg md:text-xl font-black mb-2 text-lime-800">画像をドラッグ&ドロップ</p>
-              <p className="text-sm text-slate-600 font-semibold">または Ctrl+V でペースト / ファイルを選択</p>
+              <p className="text-sm font-black mb-1 text-lime-800">画像をドラッグ&ドロップ</p>
+              <p className="text-xs text-slate-600">Ctrl+V またはファイル選択</p>
             </div>
             <input
               type="file"
@@ -328,23 +319,74 @@ export default function App() {
             />
             <label
               htmlFor="file-input"
-              className="inline-block btn-primary cursor-pointer"
+              className="inline-block px-4 py-2 rounded-lg bg-purple-500 text-white text-xs font-bold cursor-pointer hover:bg-purple-600 transition-all shadow-md"
             >
-              📁 ファイルを選択
+              📁 選択
             </label>
           </div>
         </div>
       ) : (
-        <div className="relative z-10 card-styled p-6 md:p-8">
-          <div className="relative rounded-xl overflow-hidden bg-slate-100 border-2 border-lime-300">
-            <div className="aspect-video md:aspect-auto md:h-96 flex justify-center items-center">
-              <img 
-                src={imgUrl} 
-                alt="Preview" 
-                className="w-full h-full object-contain"
-              />
-            </div>
+        <div className="relative z-10 grid grid-cols-3 gap-4 h-96">
+          {/* Left: Image */}
+          <div className="card-styled p-3 border-2 border-lime-400 shadow-xl col-span-1 overflow-hidden">
+            <img 
+              src={imgUrl} 
+              alt="Preview" 
+              className="w-full h-full object-contain"
+            />
           </div>
+
+          {/* Right: Results */}
+          {result ? (
+            <div className="col-span-2 space-y-3">
+              {/* Character & Score Summary */}
+              <div className="card-styled p-4 border-2 border-lime-400 shadow-xl h-1/2">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <h2 className="text-xl font-black text-lime-800" style={{ fontFamily: "'Playfair Display', serif" }}>
+                      {result.name}
+                    </h2>
+                    <p className="text-xs text-slate-500">COST {result.cost}</p>
+                  </div>
+                  <div className={`px-6 py-3 rounded-2xl bg-gradient-to-br ${getRankColor(result.rank)} shadow-lg border border-white/60`}>
+                    <div className="text-4xl font-black text-white" style={{ fontFamily: "'Playfair Display', serif", letterSpacing: '-0.03em' }}>
+                      {result.rank}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-3xl font-black text-lime-800 leading-none" style={{ fontFamily: "'Playfair Display', serif", letterSpacing: '-0.03em' }}>
+                  {result.score}
+                </div>
+              </div>
+
+              {/* Stats Compact */}
+              <div className="card-styled p-3 border-2 border-lime-400 shadow-xl h-1/2 overflow-y-auto">
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-lime-50 p-2 rounded-lg border border-lime-300">
+                    <div className="font-bold text-lime-800">{result.main1}</div>
+                    {result.scoreDetails?.breakdown[0] && (
+                      <div className="text-lime-700 font-black">{result.scoreDetails.breakdown[0].percentage}%</div>
+                    )}
+                  </div>
+                  {result.subs.map((sub, i) => {
+                    const breakdownItem = result.scoreDetails?.breakdown[i + 1];
+                    return (
+                      <div key={i} className="bg-lime-50 p-2 rounded-lg border border-lime-300">
+                        <div className="font-bold text-green-800 text-xs">{sub}</div>
+                        {breakdownItem && (
+                          <div className="text-lime-700 font-black text-xs">{breakdownItem.percentage}%</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="col-span-2 card-styled p-6 border-2 border-lime-300 shadow-xl flex items-center justify-center">
+              <p className="text-sm text-slate-600 font-semibold">OCR実行後に結果が表示されます</p>
+            </div>
+          )}
         </div>
       )}
 
@@ -362,174 +404,59 @@ export default function App() {
         </div>
       )}
 
-      {/* Debug Panel */}
-      <DebugPanel
-        show={debug}
-        binarized={rois?.binarized}
-        debugImage={debugImageUrl}
-        ocrRaw={ocrText}
-        confidence={confidence}
-        rects={rois?.rects}
-        roiConfig={roiConfig}
-        regions={rois?.regions}
-        threshold={threshold}
-        ocrResults={ocrResults}
-        onConfigChange={(newConfig) => {
-          setRoiConfig(newConfig);
-          saveRoiConfig(newConfig);
-        }}
-        onThresholdChange={setThreshold}
-      />
-
-      {/* Result Display */}
+      {/* Score Details Toggle - Hidden when no result */}
       {result && (
-        <div className="relative z-10 space-y-6">
-          {/* Character Info Card */}
-          <div className="card-styled p-6 md:p-8 border-2 border-lime-400 shadow-2xl">
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-              <div>
-                <h2 className="text-3xl md:text-4xl font-black bg-gradient-to-r from-lime-700 via-green-600 to-emerald-700 bg-clip-text text-transparent mb-2">
-                  {result.name}
-                </h2>
-                <div className="flex items-center gap-2 text-slate-600">
-                  <Shield size={18} className="text-lime-600" />
-                  <span className="text-sm font-semibold">音骸スコア解析完了</span>
-                </div>
-              </div>
-              <div className="px-6 py-3 rounded-xl bg-gradient-to-r from-lime-400 to-green-400 border-2 border-lime-500 text-center shadow-lg">
-                <div className="text-xs text-lime-900 font-bold mb-1">COST</div>
-                <div className="text-2xl font-black text-white drop-shadow">{result.cost}</div>
-              </div>
-            </div>
-          </div>
+        <div className="relative z-10 mt-4 space-y-2">
+          {/* Expandable Details */}
+          <button
+            onClick={() => setShowDetails(!showDetails)}
+            className="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-purple-500 to-purple-600 text-white font-bold text-xs hover:shadow-lg transition-all flex items-center justify-between"
+          >
+            <span>📊 スコア詳細情報</span>
+            <span>{showDetails ? '▼' : '▶'}</span>
+          </button>
 
-          {/* Score Display - Main Focus */}
-          <div className={`relative z-10 card-styled p-10 md:p-16 border-2 bg-gradient-to-br from-yellow-50 to-lime-50 border-lime-400 overflow-hidden group shadow-2xl`}>
-            {/* Background pattern - diagonal lines */}
-            <div className="absolute inset-0 opacity-10 pointer-events-none" style={{
-              backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(132, 204, 22, 0.3) 2px, rgba(132, 204, 22, 0.3) 4px)',
-            }}></div>
-            
-            {/* Geometric pattern - circles */}
-            <div className="absolute top-10 right-10 w-32 h-32 border-2 border-lime-300/20 rounded-full"></div>
-            <div className="absolute bottom-20 left-5 w-24 h-24 border-2 border-green-300/20 rounded-full"></div>
-            <div className="absolute top-1/3 left-1/4 w-16 h-16 border border-yellow-300/20 rounded-full"></div>
-            
-            {/* Top and bottom borders */}
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-yellow-400 to-transparent"></div>
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-lime-400 to-transparent"></div>
-            
-            <div className="absolute inset-0 bg-gradient-wave opacity-40 group-hover:opacity-60 transition-opacity"></div>
-            
-            <div className="relative flex flex-col md:flex-row items-center justify-between gap-10 md:gap-16">
-              <div className="flex-1 text-center md:text-left space-y-3">
-                <p className="text-base text-slate-600 mb-3 font-bold tracking-wider">総合スコア</p>
-                <div className="text-8xl md:text-9xl font-black leading-none text-lime-800" style={{ fontFamily: "'Playfair Display', serif", letterSpacing: '-0.03em' }}>
-                  {result.score}
+          {showDetails && (
+            <div className="card-styled p-4 border-2 border-lime-300 shadow-xl space-y-3 max-h-96 overflow-y-auto">
+              {/* Full score breakdown */}
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-lime-50 p-2 rounded-lg border border-lime-300">
+                  <div className="font-bold text-lime-800">{result.main1}</div>
+                  {result.scoreDetails?.breakdown[0] && (
+                    <div className="text-lg font-black text-lime-700">{result.scoreDetails.breakdown[0].percentage}%</div>
+                  )}
                 </div>
-              </div>
-              
-              <div className="relative">
-                {/* Rank badge with decorative frame */}
-                <div className="absolute -inset-4 bg-gradient-to-br from-yellow-300 to-lime-300 rounded-3xl opacity-20 blur-lg"></div>
-                <div className={`relative px-12 py-8 rounded-3xl bg-gradient-to-br ${getRankColor(result.rank)} shadow-2xl transform group-hover:scale-110 transition-transform border-2 border-white/60`}>
-                  <div className="text-7xl md:text-8xl font-black text-white drop-shadow-lg leading-none" style={{ fontFamily: "'Playfair Display', serif", letterSpacing: '-0.03em' }}>
-                    {result.rank}
-                  </div>
-                  <div className="absolute top-1 left-1 w-2 h-2 bg-white/40 rounded-full"></div>
-                  <div className="absolute bottom-1 right-1 w-2 h-2 bg-white/40 rounded-full"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Stats Grid */}
-          <div className="grid md:grid-cols-2 gap-8">
-            {/* Main Stats */}
-            <div className="card-styled p-8 md:p-10 border-2 border-lime-400 shadow-2xl">
-              <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-lime-300">
-                <Sparkles size={22} className="text-lime-600" />
-                <h3 className="text-2xl font-black text-lime-800" style={{ fontFamily: "'Playfair Display', serif" }}>メイン</h3>
-                <span className="text-2xl font-black text-lime-600">★</span>
-              </div>
-              <div className="space-y-4">
-                <div className="bg-gradient-to-br from-lime-50 to-white p-5 rounded-2xl border-2 border-lime-300 hover:border-lime-400 transition-all shadow-md hover:shadow-lg">
-                  <div className="text-xs text-slate-500 font-bold mb-2 uppercase tracking-wider">ステータス</div>
-                  <div className="flex items-baseline justify-between gap-4">
-                    <div className="text-lg font-bold text-lime-800">{result.main1}</div>
-                    {result.scoreDetails?.breakdown[0] && (
-                      <div className="text-2xl font-black text-lime-700 font-mono" style={{ fontFamily: "'Crimson Text', serif" }}>
-                        {result.scoreDetails.breakdown[0].percentage}%
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="bg-gradient-to-br from-green-50 to-white p-5 rounded-2xl border-2 border-green-300 hover:border-green-400 transition-all shadow-md hover:shadow-lg">
-                  <div className="text-xs text-slate-500 font-bold mb-2 uppercase tracking-wider">補助</div>
-                  <div className="text-lg font-bold text-green-800 font-mono">{result.main2}</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Sub Stats */}
-            {result.subs.length > 0 && (
-              <div className="card-styled p-8 md:p-10 border-2 border-lime-400 shadow-2xl">
-                <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-lime-300">
-                  <Zap size={22} className="text-green-600" />
-                  <h3 className="text-2xl font-black text-lime-800" style={{ fontFamily: "'Playfair Display', serif" }}>サブ</h3>
-                  <span className="text-2xl font-black text-green-600">✦</span>
-                </div>
-                <div className="space-y-3">
-                  {result.subs.map((sub, i) => {
-                    const breakdownItem = result.scoreDetails?.breakdown[i + 1];
-                    return (
-                      <div key={i} className="bg-gradient-to-br from-lime-50 to-white p-4 rounded-xl border-2 border-lime-300 hover:border-lime-400 transition-all shadow-md hover:shadow-lg">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex-1">
-                            <span className="text-xs text-slate-500 font-bold block uppercase tracking-wider">Sub {i + 1}</span>
-                            <span className="font-mono font-bold text-green-800 text-sm mt-1">{sub}</span>
-                          </div>
-                          {breakdownItem && (
-                            <span className="text-xl font-black text-lime-700 font-mono flex-shrink-0" style={{ fontFamily: "'Crimson Text', serif" }}>
-                              {breakdownItem.percentage}%
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Score Breakdown */}
-          {result.scoreDetails && (
-            <div className="card-styled p-8 md:p-10 border-2 border-lime-400 shadow-2xl">
-              <h3 className="text-2xl font-black text-lime-800 mb-6" style={{ fontFamily: "'Playfair Display', serif" }}>スコア計算詳細</h3>
-              <div className="section-divider mb-6"></div>
-              <div className="space-y-3 font-mono text-sm">
-                {result.scoreDetails.breakdown.map((item: any, idx: number) => {
-                  const label = item.type === 'main1' ? 'メイン' : `サブ${item.index}`;
+                {result.subs.map((sub, i) => {
+                  const breakdownItem = result.scoreDetails?.breakdown[i + 1];
                   return (
-                    <div key={idx} className="bg-gradient-to-r from-white to-lime-50 p-4 rounded-lg flex justify-between items-center border-2 border-lime-300 hover:border-lime-400 transition-all shadow-md hover:shadow-lg">
-                      <span className="text-slate-800 font-bold flex-1">
-                        <span className="text-lime-700">{label}</span>
-                        <span className="text-slate-500 mx-2">({item.statName})</span>
-                      </span>
-                      <span className="text-lime-800 font-black text-right">
-                        {item.percentage}% × {item.weight.toFixed(2)} 
-                        <span className="text-slate-400 mx-1">=</span>
-                        <span className="text-lg">{item.contribution}</span>
-                      </span>
+                    <div key={i} className="bg-lime-50 p-2 rounded-lg border border-lime-300">
+                      <div className="font-bold text-green-800">{sub}</div>
+                      {breakdownItem && (
+                        <div className="text-lg font-black text-lime-700">{breakdownItem.percentage}%</div>
+                      )}
                     </div>
                   );
                 })}
-                <div className="bg-gradient-to-br from-lime-300 via-green-300 to-emerald-300 p-5 rounded-xl flex justify-between items-center border-2 border-lime-500 mt-6 shadow-lg" style={{ backgroundImage: 'linear-gradient(135deg, rgba(132, 204, 22, 0.3) 0%, rgba(34, 197, 94, 0.3) 100%)' }}>
-                  <span className="text-slate-800 font-black text-lg">合計スコア</span>
-                  <span className="text-4xl font-black bg-gradient-to-r from-lime-700 to-green-700 bg-clip-text text-transparent" style={{ fontFamily: "'Playfair Display', serif" }}>
-                    {result.score}
-                  </span>
+              </div>
+
+              {/* Recognition Text */}
+              {result.scoreDetails?.rawText && (
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-300 text-xs">
+                  <p className="font-bold text-slate-700 mb-2">✓ 認識テキスト</p>
+                  <p className="text-slate-600 leading-relaxed font-mono text-xs break-all">
+                    {result.scoreDetails.rawText}
+                  </p>
+                </div>
+              )}
+
+              {/* Calculation Details */}
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-300 text-xs">
+                <p className="font-bold text-slate-700 mb-2">💡 計算詳細</p>
+                <div className="space-y-1 text-slate-600 font-mono text-xs">
+                  <p>スコア: {result.score}</p>
+                  <p>ランク: {result.rank}</p>
+                  <p>キャラクター: {result.name}</p>
+                  <p>コスト: {result.cost}</p>
                 </div>
               </div>
             </div>
@@ -539,19 +466,39 @@ export default function App() {
 
       {/* Reset Button */}
       {imgUrl && (
-        <div className="relative z-10 flex justify-center">
-          <button
-            onClick={() => {
-              setImgUrl(null);
-              setImgEl(null);
-              setResult(null);
-              setDebugImageUrl(undefined);
+        <>
+          {/* Debug Panel */}
+          <DebugPanel
+            show={debug}
+            binarized={rois?.binarized}
+            debugImage={debugImageUrl}
+            ocrRaw={ocrText}
+            confidence={confidence}
+            rects={rois?.rects}
+            roiConfig={roiConfig}
+            regions={rois?.regions}
+            threshold={threshold}
+            ocrResults={ocrResults}
+            onConfigChange={(newConfig) => {
+              setRoiConfig(newConfig);
+              saveRoiConfig(newConfig);
             }}
-            className="btn-secondary"
-          >
-            ↻ 新しい画像を読み込む
-          </button>
-        </div>
+            onThresholdChange={setThreshold}
+          />
+          <div className="relative z-10 flex justify-center mt-4">
+            <button
+              onClick={() => {
+                setImgUrl(null);
+                setImgEl(null);
+                setResult(null);
+                setDebugImageUrl(undefined);
+              }}
+              className="btn-secondary"
+            >
+              ↻ 新しい画像を読み込む
+            </button>
+          </div>
+        </>
       )}
     </div>
   );
