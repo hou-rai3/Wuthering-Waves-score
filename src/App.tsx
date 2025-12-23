@@ -4,7 +4,7 @@ import { useOcr } from './hooks/useOcr';
 import { DebugPanel } from './components/DebugPanel';
 import { loadRoiConfig, saveRoiConfig, type RoiConfig } from './utils/roiConfig';
 import { cleanText, getScoreRank, calculateScoreWithBreakdown, extractPercentage } from './utils/scoreCalculator';
-import { Upload, Sparkles, Zap, Shield } from 'lucide-react';
+import { Upload, Zap } from 'lucide-react';
 
 type EchoScore = {
   name: string;
@@ -195,7 +195,7 @@ export default function App() {
       const msg = err instanceof Error ? err.message : 'OCR処理に失敗しました';
       showToast(msg, 'error');
     }
-  }, [rois, recognize, showToast]);
+  }, [rois, recognize, showToast, selectedCharacter]);
 
   React.useEffect(() => {
     if (imgEl && rois && ready && !loading) {

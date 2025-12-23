@@ -26,8 +26,8 @@ type Props = {
   roiConfig?: RoiConfig;
   threshold?: number;
   ocrResults?: Record<string, { text: string; confidence: number }>;
-  onConfigChange?: (config: RoiConfig) => void;
-  onThresholdChange?: (threshold: number) => void;
+  onConfigChange?: (_: RoiConfig) => void;
+  onThresholdChange?: (_: number) => void;
   show: boolean;
 };
 
@@ -88,7 +88,7 @@ export const DebugPanel: React.FC<Props> = ({
 
   const renderCoordInput = (
     value: number,
-    onChange: (val: number) => void,
+    onChange: (value: number) => void,
     label: string
   ) => (
     <div className="space-y-1">
