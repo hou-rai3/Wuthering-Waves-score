@@ -16,10 +16,24 @@
   
   body {
     @apply bg-gradient-to-br from-lime-100 via-yellow-50 to-green-100 text-slate-900 overflow-x-hidden;
+    position: relative;
+  }
+  
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background-image: 
+      repeating-linear-gradient(45deg, transparent, transparent 40px, rgba(132, 204, 22, 0.04) 40px, rgba(132, 204, 22, 0.04) 42px),
+      repeating-linear-gradient(-45deg, transparent, transparent 40px, rgba(34, 197, 94, 0.04) 40px, rgba(34, 197, 94, 0.04) 42px);
+    z-index: 0;
   }
   
   #root {
     @apply min-h-screen;
+    position: relative;
+    z-index: 1;
   }
 }
 

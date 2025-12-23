@@ -405,7 +405,17 @@ export default function App() {
 
           {/* Score Display - Main Focus */}
           <div className={`relative z-10 card-styled p-10 md:p-16 border-2 bg-gradient-to-br from-yellow-50 to-lime-50 border-lime-400 overflow-hidden group shadow-2xl`}>
-            {/* Background decoration */}
+            {/* Background pattern - diagonal lines */}
+            <div className="absolute inset-0 opacity-10 pointer-events-none" style={{
+              backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(132, 204, 22, 0.3) 2px, rgba(132, 204, 22, 0.3) 4px)',
+            }}></div>
+            
+            {/* Geometric pattern - circles */}
+            <div className="absolute top-10 right-10 w-32 h-32 border-2 border-lime-300/20 rounded-full"></div>
+            <div className="absolute bottom-20 left-5 w-24 h-24 border-2 border-green-300/20 rounded-full"></div>
+            <div className="absolute top-1/3 left-1/4 w-16 h-16 border border-yellow-300/20 rounded-full"></div>
+            
+            {/* Top and bottom borders */}
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-yellow-400 to-transparent"></div>
             <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-lime-400 to-transparent"></div>
             
@@ -414,7 +424,7 @@ export default function App() {
             <div className="relative flex flex-col md:flex-row items-center justify-between gap-10 md:gap-16">
               <div className="flex-1 text-center md:text-left space-y-3">
                 <p className="text-base text-slate-600 mb-3 font-bold tracking-wider">総合スコア</p>
-                <div className="text-7xl md:text-8xl font-black bg-gradient-to-r from-lime-600 via-green-600 to-emerald-600 bg-clip-text text-transparent" style={{ fontFamily: "'Playfair Display', serif" }}>
+                <div className="text-8xl md:text-9xl font-black leading-none text-lime-800" style={{ fontFamily: "'Playfair Display', serif", letterSpacing: '-0.03em' }}>
                   {result.score}
                 </div>
               </div>
@@ -423,7 +433,7 @@ export default function App() {
                 {/* Rank badge with decorative frame */}
                 <div className="absolute -inset-4 bg-gradient-to-br from-yellow-300 to-lime-300 rounded-3xl opacity-20 blur-lg"></div>
                 <div className={`relative px-12 py-8 rounded-3xl bg-gradient-to-br ${getRankColor(result.rank)} shadow-2xl transform group-hover:scale-110 transition-transform border-2 border-white/60`}>
-                  <div className="text-7xl md:text-8xl font-black text-white drop-shadow-lg" style={{ fontFamily: "'Playfair Display', serif" }}>
+                  <div className="text-7xl md:text-8xl font-black text-white drop-shadow-lg leading-none" style={{ fontFamily: "'Playfair Display', serif", letterSpacing: '-0.03em' }}>
                     {result.rank}
                   </div>
                   <div className="absolute top-1 left-1 w-2 h-2 bg-white/40 rounded-full"></div>
