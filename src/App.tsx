@@ -266,6 +266,7 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-700">キャラクター選択</span>
             <select
               value={selectedCharacter}
               onChange={(e) => setSelectedCharacter(e.target.value)}
@@ -282,7 +283,7 @@ export default function App() {
                   : 'bg-white border-2 border-lime-400 text-lime-800'
               }`}
             >
-              {debug ? '🔧' : '◎'}
+              {debug ? '🔧 デバッグON' : '◎ デバッグ'}
             </button>
           </div>
         </div>
@@ -362,7 +363,7 @@ export default function App() {
               {/* Stats Compact */}
               <div className="card-styled p-3 border-2 border-lime-400 shadow-xl h-1/2 overflow-y-auto">
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-lime-50 p-2 rounded-lg border border-lime-300">
+                  <div className="bg-lime-50 p-2 rounded-2xl border-2 border-lime-300">
                     <div className="font-bold text-lime-800">{result.main1}</div>
                     {result.scoreDetails?.breakdown[0] && (
                       <div className="text-lime-700 font-black">{result.scoreDetails.breakdown[0].percentage}%</div>
@@ -371,7 +372,7 @@ export default function App() {
                   {result.subs.map((sub, i) => {
                     const breakdownItem = result.scoreDetails?.breakdown[i + 1];
                     return (
-                      <div key={i} className="bg-lime-50 p-2 rounded-lg border border-lime-300">
+                      <div key={i} className="bg-lime-50 p-2 rounded-2xl border-2 border-lime-300">
                         <div className="font-bold text-green-800 text-xs">{sub}</div>
                         {breakdownItem && (
                           <div className="text-lime-700 font-black text-xs">{breakdownItem.percentage}%</div>
