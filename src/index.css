@@ -2,11 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700;900&family=Playfair+Display:wght@700;900&family=Crimson+Text:ital@0;1&display=swap');
 
 @layer base {
   * {
     font-family: 'Noto Sans JP', sans-serif;
+  }
+  
+  h1, h2, h3 {
+    font-family: 'Playfair Display', serif;
+    letter-spacing: -0.02em;
   }
   
   body {
@@ -24,11 +29,31 @@
   }
   
   .gradient-border {
-    @apply relative bg-gradient-to-br from-lime-200/40 to-green-200/40 rounded-2xl border-2 border-lime-400/60;
+    @apply relative bg-gradient-to-br from-lime-200/40 to-green-200/40 rounded-3xl border-2 border-lime-400/60;
+    box-shadow: inset 0 2px 8px rgba(255,255,255,0.5), 0 8px 24px rgba(132, 204, 22, 0.15);
+  }
+  
+  .gradient-border::before {
+    @apply absolute inset-0 pointer-events-none rounded-3xl;
+    content: '';
+    background: linear-gradient(135deg, rgba(217, 119, 6, 0.1) 0%, transparent 50%);
   }
   
   .btn-primary {
     @apply px-6 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-400 hover:to-purple-500 text-white font-bold transition-all duration-300 shadow-lg hover:shadow-purple-400/50 hover:scale-105;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .btn-primary::before {
+    content: '';
+    @apply absolute inset-0 bg-white/20 rounded-xl;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+  
+  .btn-primary:hover::before {
+    transform: translateX(100%);
   }
   
   .btn-secondary {
@@ -36,6 +61,33 @@
   }
   
   .card-styled {
-    @apply rounded-2xl border-2 border-lime-300 bg-white/90 backdrop-blur-sm shadow-xl;
+    @apply rounded-3xl border-2 border-lime-300 bg-white/95 backdrop-blur-sm;
+    box-shadow: 0 12px 32px rgba(132, 204, 22, 0.12), inset 0 1px 0 rgba(255,255,255,0.6);
+    position: relative;
+  }
+  
+  .card-styled::before {
+    @apply absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white to-transparent;
+    content: '';
+  }
+  
+  .section-divider {
+    @apply h-0.5 bg-gradient-to-r from-transparent via-lime-400 to-transparent;
+    position: relative;
+  }
+  
+  .section-divider::before,
+  .section-divider::after {
+    content: '';
+    @apply absolute top-1/2 w-2 h-2 bg-lime-400 rounded-full;
+    transform: translateY(-50%);
+  }
+  
+  .section-divider::before {
+    left: 0;
+  }
+  
+  .section-divider::after {
+    right: 0;
   }
 }
