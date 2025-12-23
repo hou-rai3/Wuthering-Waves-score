@@ -329,7 +329,7 @@ export default function App() {
       ) : (
         <div className="relative z-10 grid grid-cols-3 gap-4 items-start">
           {/* Left: Image */}
-          <div className="card-styled p-3 border-2 border-lime-400 shadow-xl col-span-1 overflow-hidden h-[420px]">
+          <div className="card-styled p-3 border-2 border-lime-400 shadow-xl col-span-1 overflow-hidden h-[360px]">
             <img 
               src={imgUrl} 
               alt="Preview" 
